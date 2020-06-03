@@ -345,7 +345,7 @@ formatear_particiones(){
             ;;
           otra)
             if [[ ${partition_name[i]} == otra ]]; then
-              read_input_text "Deseas seguir Configurando mas Pariciones"
+              read_input_text "Deseas seguir Configurando esta particion"
               [[ $OPTION != s ]] && break
             fi
             read -p "Punto de Montaje [ex: /home]:" directory
