@@ -1,0 +1,98 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+if [[ -f `pwd`/functions ]]; then
+  source functions
+else
+  echo "Archivo no disponible: functions"
+  exit 1
+fi
+#Bienvenidos{{{
+bienvenidos(){
+  clear
+  echo -e "${Bold}BIENVENIDOS AL MENU DE INSTALACION SISTEMA BASE/DRIVERS/ESCRITORIO/APLICACIONES${White}"
+  print_line
+  echo "Requerimientos:"
+  echo "-> Sistema Archlinux"
+  echo "-> Instalacion Sistema Base ArchLinux(Menu 2)"
+  echo "-> Ejecutar Instalador como usuario root"
+  echo "-> Conexión a Internet"
+  print_line
+  echo "Para Cancelar la Instalacion Precione CTRL+C"
+  echo "http://www.github.com/archlinuxlatino/ISA"
+  echo "visita nuestras redes @archlinuxlatino"
+  print_line
+  echo -e "\nCopias de Seguridad:"
+  print_line
+  # backup old configs
+  [[ ! -f /etc/pacman.conf.backup ]] && cp -v /etc/pacman.conf /etc/pacman.conf.backup || echo "/etc/pacman.conf.backup";
+  [[ -f /etc/ssh/sshd_config.backup ]] && echo "/etc/ssh/sshd_conf.backup";
+  [[ -f /etc/sudoers.backup ]] && echo "/etc/sudoers.backup";
+  pause_function
+  echo ""
+}
+#}}}
+#FINISH {{{
+finish() {
+  print_title "INSTALACION COMPLETA"
+  print_warning "Se copiara la carpeta a root"
+  cp -R $(pwd) ${MOUNTPOINT}/root
+  read_input_text "Reiniciar"
+  if [[ $OPTION == s ]]; then
+    desmontar_particiones
+    reboot
+  fi
+  exit 0
+}
+salir(){
+  exit 0
+}
+#}}}
+#Limpiar Cache{{{
+limpiar_cache(){
+  print_title "CLEAN ORPHAN PACKAGES"
+  pacman -Rsc --noconfirm $(pacman -Qqdt)
+  #pacman -Sc --noconfirm
+  pacman-optimize
+}
+#}}}
+bienvenidos
+#Instalacion Archlinux{{{
+print_title "INSTALAR ARCHLINUX 2020"
+print_info "Scripts Simple de Instalacion"
+print_danger "Haz todo con cuidado y la mejor arma es leer. visitanos en nuestras redes como @archlinuxlatino"
+pause_function
+#check_boot_system
+check_connection
+check_trim
+pacman -Sy
+while true; do
+  print_title "    MENU DE INSTALACION ARCHLINUX 2020"
+  print_line
+  echo ""
+  echo "  1) $(mainmenu_item "${checklist[1]}" "SISTEMA BASE ARCHLINUX")"
+  echo "  2) $(mainmenu_item "${checklist[2]}" "CONFIGURACION POST-INSTALACION (SISTEMA BASE INSTALADO)")"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  read_input_options
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        menus/./01-sistema-base
+        salir
+        checklist[1]=1
+        ;;
+      2)
+        menus/./02-config-basica
+        salir
+        checklist[2]=1
+        ;;
+      "s")
+        finish
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+done
