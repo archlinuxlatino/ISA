@@ -1,0 +1,291 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+
+if [[ -f `pwd`/functions ]]; then
+  source functions
+else
+  echo "Archivo no disponible: functions"
+  exit 1
+fi
+#BIENVENIDOS{{{
+bienvenidos(){
+  clear
+  echo -e "${Bold}BIENVENIDOS AL INSTALADOR DE LA RED WIFI O CABLEADA${White}"
+  print_line
+  echo "Requerimientos:"
+  echo "-> Instalacion Sistema Base ArchLinux y Escritorio"
+  echo "-> Ejecutar Instalador como usuario root"
+  echo "-> Conexión a Internet"
+  print_line
+  echo -e "\nCopias de Seguridad:"
+  print_line
+  # backup old configs
+  [[ ! -f /etc/pacman.conf.backup ]] && cp -v /etc/pacman.conf /etc/pacman.conf.backup || echo "/etc/pacman.conf.backup";
+  [[ -f /etc/ssh/sshd_config.backup ]] && echo "/etc/ssh/sshd_conf.backup";
+  [[ -f /etc/sudoers.backup ]] && echo "/etc/sudoers.backup";
+  pause_function
+  echo ""
+}
+#}}}
+#Seleccionar Usuario{{{
+select_user(){
+  print_title "SELECCIONAR USUARIO"
+  users_list=(`cat /etc/passwd | grep "/home" | cut -d: -f1`);
+  PS3="$prompt1"
+  echo "Usuarios Disponibles:"
+  if [[ $(( ${#users_list[@]} )) -gt 0 ]]; then
+    print_warning "ADVERTENCIA: EL USUARIO SELECCIONADO DEBE TENER PRIVILEGIOS SUDO"
+  else
+    echo ""
+  fi
+  select OPT in "${users_list[@]}"; do
+    if contains_element "$OPT" "${users_list[@]}"; then
+      username=$OPT
+    else
+      invalid_option
+    fi
+    [[ -n $OPT ]] && break
+  done
+}
+#}}}
+#CONNMAN/NETWORKMANAGER/WICD{{{
+instalar_red(){
+  print_title "ADMINISTRADORES DE REDES"
+  echo " 1) $(menu_item "networkmanager" "Networkmanager")"
+  echo " 2) $(menu_item "connman" "ConnMan")"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  NETWORKMANAGER_OPTIONS+=" s"
+  read_input_options "$NETWORKMANAGER_OPTIONS"
+  for OPT in ${OPTIONS[@]}; do
+   case "$OPTION" in
+    1)
+      print_title "NETWORKMANAGER"
+      print_info "NetworkManager es un programa para proporcionar detección y configuración para sistemas que se conectan automáticamente a la red. La funcionalidad de NetworkManager puede ser útil para redes inalámbricas y cableadas."
+      package_install "networkmanager dnsmasq networkmanager-openconnect networkmanager-openvpn networkmanager-pptp networkmanager-vpnc"
+      if [[ ${KDE} -eq 1 ]]; then
+        package_install "plasma-nm"
+      elif [[ ${GTK} -eq 1 ]]; then
+        package_install "network-manager-applet nm-connection-editor gnome-keyring"
+      fi
+      # network management daemon
+      system_ctl enable NetworkManager.service
+      pause_function
+      ;;
+    2)
+      print_title "CONNMAN "
+      print_info "ConnMan es una alternativa a NetworkManager y Wicd y fue creado por Intel y el proyecto Moblin para su uso con dispositivos integrados."
+      package_install "connman cmst"
+      # ConnMan daemon
+      system_ctl enable connman.service
+      pause_function
+      ;;
+    "s")
+      break
+      ;;
+    *)
+      invalid_option
+      ;;
+   esac
+  done
+}
+#}}}
+#USB 3G MODEM {{{
+instalar_modem_3g(){
+  print_title "USB 3G MODEM"
+  print_info "Varias redes de telefonía móvil en todo el mundo ofrecen conexiones de internet móvil a través de UMTS (o EDGE o GSM) utilizando un dispositivo de módem USB portátil."
+  read_input_text "Instalar soporte para módem usb 3G" $USBMODEM
+  if [[ $OPTION == s ]]; then
+    package_install "usbutils usb_modeswitch"
+    if is_package_installed "networkmanager"; then
+      package_install "modemmanager"
+      [[ ${KDE} -eq 1 ]] && package_install "modemmanager-qt"
+      system_ctl enable ModemManager.service
+    else
+      package_install "wvdial"
+    fi
+    pause_function
+  fi
+}
+#}}}
+#BLUETOOTH {{{
+instalar_bluetooth(){
+  print_title "BLUETOOTH"
+  print_info "Bluetooth es un estándar para la interconexión inalámbrica de corto alcance de teléfonos celulares, computadoras y otros dispositivos electrónicos. En Linux, la implementación canónica de la pila de protocolos Bluetooth es BlueZ"
+  read_input_text "Instalar Sopporte bluetooth?" $BLUETOOTH
+  if [[ $OPTION == y ]]; then
+    package_install "bluez bluez-utils"
+    system_ctl enable bluetooth.service
+    pause_function
+  fi
+}
+#}}}
+#SAMBA {{{
+instalar_samba(){
+  print_title "SAMBA - Protocolo de Comparticion de Archivos por RED"
+  print_info "Samba es una re-implementación del protocolo de red SMB/CIFS, facilita el intercambio de archivos e impresoras entre los sistemas Linux y Windows como una alternativa a NFS."
+  read_input_text "Instalar Samba?" $SAMBA
+  if [[ $OPTION == s ]]; then
+    package_install "wget samba smbnetfs"
+    [[ ! -f /etc/samba/smb.conf ]] && wget -q -O /etc/samba/smb.conf "https://git.samba.org/samba.git/?p=samba.git;a=blob_plain;f=examples/smb.conf.default;hb=HEAD"
+    local CONFIG_SAMBA=`cat /etc/samba/smb.conf | grep usershare`
+    if [[ -z $CONFIG_SAMBA ]]; then
+      # configure usershare
+      export USERSHARES_DIR="/var/lib/samba/usershare"
+      export USERSHARES_GROUP="sambashare"
+      mkdir -p ${USERSHARES_DIR}
+      groupadd ${USERSHARES_GROUP}
+      chown root:${USERSHARES_GROUP} ${USERSHARES_DIR}
+      chmod 1770 ${USERSHARES_DIR}
+      sed -i -e '/\[global\]/a\\n   usershare path = /var/lib/samba/usershare\n   usershare max shares = 100\n   usershare allow guests = yes\n   usershare owner only = False' /etc/samba/smb.conf
+      sed -i -e '/\[global\]/a\\n   socket options = IPTOS_LOWDELAY TCP_NODELAY SO_KEEPALIVE\n   write cache size = 2097152\n   use sendfile = yes\n' /etc/samba/smb.conf
+      usermod -a -G ${USERSHARES_GROUP} ${username}
+      sed -i '/user_allow_other/s/^#//' /etc/fuse.conf
+      modprobe fuse
+    fi
+    echo "Ingrese nueva contraseña de su cuenta samba:"
+    pdbedit -a -u ${username}
+    while [[ $? -ne 0 ]]; do
+      pdbedit -a -u ${username}
+    done
+    # enable services
+    system_ctl enable smb.service
+    system_ctl enable nmb.service
+    pause_function
+  fi
+}
+#}}}
+#SSH {{{
+instalar_ssh(){
+  print_title " SSH - OPENSSH"
+  print_info "Secure Shell (SSH) es un protocolo de red que permite el intercambio de datos a través de un canal seguro entre dos computadoras."
+  read_input_text "Instalar ssh?" $SSH
+  if [[ $OPTION == s ]]; then
+    package_install "openssh"
+    system_ctl enable sshd
+    [[ ! -f /etc/ssh/sshd_config.backup ]] && cp -v /etc/ssh/sshd_config /etc/ssh/sshd_config.backup;
+    #CONFIGURE SSHD_CONF #{{{
+    sed -i '/Port 22/s/^#//' /etc/ssh/sshd_config
+    sed -i '/Protocol 2/s/^#//' /etc/ssh/sshd_config
+    sed -i '/HostKey \/etc\/ssh\/ssh_host_rsa_key/s/^#//' /etc/ssh/sshd_config
+    sed -i '/HostKey \/etc\/ssh\/ssh_host_dsa_key/s/^#//' /etc/ssh/sshd_config
+    sed -i '/HostKey \/etc\/ssh\/ssh_host_ecdsa_key/s/^#//' /etc/ssh/sshd_config
+    sed -i '/KeyRegenerationInterval/s/^#//' /etc/ssh/sshd_config
+    sed -i '/ServerKeyBits/s/^#//' /etc/ssh/sshd_config
+    sed -i '/SyslogFacility/s/^#//' /etc/ssh/sshd_config
+    sed -i '/LogLevel/s/^#//' /etc/ssh/sshd_config
+    sed -i '/LoginGraceTime/s/^#//' /etc/ssh/sshd_config
+    sed -i '/PermitRootLogin/s/^#//' /etc/ssh/sshd_config
+    sed -i '/HostbasedAuthentication no/s/^#//' /etc/ssh/sshd_config
+    sed -i '/StrictModes/s/^#//' /etc/ssh/sshd_config
+    sed -i '/RSAAuthentication/s/^#//' /etc/ssh/sshd_config
+    sed -i '/PubkeyAuthentication/s/^#//' /etc/ssh/sshd_config
+    sed -i '/IgnoreRhosts/s/^#//' /etc/ssh/sshd_config
+    sed -i '/PermitEmptyPasswords/s/^#//' /etc/ssh/sshd_config
+    sed -i '/AllowTcpForwarding/s/^#//' /etc/ssh/sshd_config
+    sed -i '/AllowTcpForwarding no/d' /etc/ssh/sshd_config
+    sed -i '/X11Forwarding/s/^#//' /etc/ssh/sshd_config
+    sed -i '/X11Forwarding/s/no/yes/' /etc/ssh/sshd_config
+    sed -i -e '/\tX11Forwarding yes/d' /etc/ssh/sshd_config
+    sed -i '/X11DisplayOffset/s/^#//' /etc/ssh/sshd_config
+    sed -i '/X11UseLocalhost/s/^#//' /etc/ssh/sshd_config
+    sed -i '/PrintMotd/s/^#//' /etc/ssh/sshd_config
+    sed -i '/PrintMotd/s/yes/no/' /etc/ssh/sshd_config
+    sed -i '/PrintLastLog/s/^#//' /etc/ssh/sshd_config
+    sed -i '/TCPKeepAlive/s/^#//' /etc/ssh/sshd_config
+    sed -i '/the setting of/s/^/#/' /etc/ssh/sshd_config
+    sed -i '/RhostsRSAAuthentication and HostbasedAuthentication/s/^/#/' /etc/ssh/sshd_config
+    #}}}
+    pause_function
+  fi
+}
+#}}}
+#NFS {{{
+instalar_nfs(){
+  print_title " NFS -- NFS-UTILS "
+  print_info "NFS permite que un usuario en una computadora cliente acceda a archivos a través de una red de manera similar a cómo se accede al almacenamiento local."
+  read_input_text "Instalarl nfs?" $NFS
+  if [[ $OPTION == s ]]; then
+    package_install "nfs-utils"
+    system_ctl enable rpcbind
+    system_ctl enable nfs-client.target
+    system_ctl enable remote-fs.target
+    pause_function
+  fi
+}
+#}}}
+#Salir{{{
+salir(){
+  exit 0
+}
+#}}}
+check_root
+check_archlinux
+check_hostname
+check_pacman_blocked
+check_multilib
+pacman_key
+bienvenidos
+select_user
+if is_package_installed "qt5-wayland"; then KDE=1; fi
+if is_package_installed "gtk3"; then GTK=1;fi
+if is_package_installed "bluez"; then BLUE=1;fi
+if is_package_installed "usb_modeswitch"; then MODEN=1;fi
+if is_package_installed "networkmanager"; then NM=1;fi
+if is_package_installed "connman"; then CONN=1;fi
+if is_package_installed "samba"; then SAMBA=1;fi
+if is_package_installed "nfs-utils"; then NFS=1;fi
+if is_package_installed "openssh"; then SSH=1;fi
+while true
+do
+  print_title "INSTALADOR DE SISTEMA DE RED"
+  print_warning "USUARIO: ${username}"
+  print_warning "ESCRITORIO: $([[ ${KDE} -eq 1 ]] && echo "Basado en QT (Plasma, LXQT)" || [[ ${GTK} -eq 1 ]] && echo "Basado en GTK(MATE,XFCE,GNOME)" || echo "Error sin escritorio";)"
+  echo " "
+  echo " 1) $(mainmenu_item "${checklist[1]}" "Administrador de Redes" "$([[ ${NM} -eq 1 ]] && echo "NetworkManager" || [[ ${CONN} -eq 1 ]] && echo "Connman";)")"
+  echo " 2) $(mainmenu_item "${checklist[2]}" "Instalar Gestion Bluetooth" "$([[ ${BLUE} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
+  echo " 3) $(mainmenu_item "${checklist[3]}" "Instalar USB Moden 3G" "$([[ ${MODEN} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
+  echo " 4) $(mainmenu_item "${checklist[4]}" "Instalar Protocolo SAMBA" "$([[ ${SAMBA} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
+  echo " 5) $(mainmenu_item "${checklist[5]}" "Instalar Protocolo NFS" "$([[ ${NFS} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
+  echo " 5) $(mainmenu_item "${checklist[6]}" "Instalar Protocolo SSH" "$([[ ${SSH} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
+  echo " "
+  echo " s) Salir"
+  echo " "
+  MAINMENU+=" s"
+  read_input_options "$MAINMENU"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        instalar_red
+        checklist[1]=1
+        ;;
+      2)
+        instalar_bluetooth
+        checklist[2]=1
+        ;;
+      3)
+        instalar_modem_3g
+        checklist[3]=1
+        ;;
+      4)
+        instalar_samba
+        checklist[4]=1
+        ;;
+      5)
+        instalar_nfs
+        checklist[5]=1
+        ;;
+      6)
+        instalar_ssh
+        checklist[6]=1
+        ;;
+      "s")
+        salir
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+done

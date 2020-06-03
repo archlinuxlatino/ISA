@@ -1,0 +1,119 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+if [[ -f `pwd`/functions ]]; then
+  source functions
+else
+  echo "Archivo no disponible: functions"
+  exit 1
+fi
+#Seleccionar Usuario{{{
+select_user(){
+  print_title "SELECCIONAR USUARIO"
+  users_list=(`cat /etc/passwd | grep "/home" | cut -d: -f1`);
+  PS3="$prompt1"
+  echo "Usuarios Disponibles:"
+  if [[ $(( ${#users_list[@]} )) -gt 0 ]]; then
+    print_warning "ADVERTENCIA: EL USUARIO SELECCIONADO DEBE TENER PRIVILEGIOS SUDO"
+  else
+    echo ""
+  fi
+  select OPT in "${users_list[@]}"; do
+    if contains_element "$OPT" "${users_list[@]}"; then
+      username=$OPT
+    else
+      invalid_option
+    fi
+    [[ -n $OPT ]] && break
+  done
+}
+#}}}
+#Salir{{{
+salir(){
+  exit 0
+}
+#}}}
+#FIRMWARE {{{
+instalar_firmwares(){
+  print_title "INSTALAR FIRMWARES (DRIVER) ADICIONALES"
+    while true
+    do
+      print_title "INSTALAR FIRMWARES (DRIVER) ADICIONALES"
+      print_warning "Usuario: ${username}"
+      echo ""
+      echo " 1) $(menu_item "alsa-firmware")"
+      echo " 2) $(menu_item "bluez-firmware") [Broadcom BCM203x/STLC2300 Bluetooth]"
+      echo " 3) $(menu_item "broadcom-wl-dkms")"
+      echo " 4) $(menu_item "ipw2100-fw")"
+      echo " 5) $(menu_item "ipw2200-fw")"
+      echo " 6) $(menu_item "libffado") [Fireware Audio Devices]"
+      echo " 7) $(menu_item "libraw1394") [IEEE1394 Driver]"
+      echo " 8) $(menu_item "xf86-input-synaptics" "TouchPad Portatiles")"
+      echo " 9) $(menu_item "hplip" "Impresoras HP")[hplip]"
+      echo ""
+      echo " s) Salir"
+      echo ""
+      FIRMWARE_OPTIONS+=" s"
+      read_input_options "$FIRMWARE_OPTIONS"
+      for OPT in ${OPTIONS[@]}; do
+        case "$OPT" in
+          1)
+            package_install "alsa-firmware"
+            ;;
+          2)
+            package_install "bluez-firmware"
+            ;;
+          3)
+            package_install "broadcom-wl-dkms"
+            ;;
+          4)
+            package_install "ipw2100-fw"
+            ;;
+          5)
+            package_install "ipw2200-fw"
+            ;;
+          6)
+            package_install "libffado"
+            ;;
+          7)
+            package_install "libraw1394"
+            ;;
+          8)
+            package_install "xf86-input-synaptics"
+            ;;
+          9)
+            package_install "hplip"
+            ;;
+          "s")
+            salir
+            ;;
+          *)
+            invalid_option
+            ;;
+        esac
+      done
+      source sharedfuncs_elihw
+      create_ramdisk_environment
+    done
+}
+#}}}
+create_ramdisk_environment(){
+  if [ "$(ls /boot | grep hardened -c)" -gt "0" ]; then
+    mkinitcpio -p linux-hardened
+  elif [ "$(ls /boot | grep lts -c)" -gt "0" ]; then
+    mkinitcpio -p linux-lts
+  elif [ "$(ls /boot | grep zen -c)" -gt "0" ]; then
+    mkinitcpio -p linux-zen
+  else
+    mkinitcpio -p linux
+  fi
+}
+#Inicio de Menu{{{
+check_root
+check_archlinux
+check_hostname
+check_pacman_blocked
+check_multilib
+pacman_key
+select_user
+instalar_firmwares
+#}}}

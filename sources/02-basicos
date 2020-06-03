@@ -1,0 +1,89 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+if [[ -f `pwd`/functions ]]; then
+  source functions
+else
+  echo "Archivo no disponible: functions"
+  exit 1
+fi
+#Paquetes Basicos{{{
+instalar_basicos(){
+  print_title "HERRAMIENTAS BASH - USUARIO: ${username}"
+  package_install "bc rsync mlocate bash-completion pkgstats"
+  pause_function
+  print_title "HERRAMIENTAS DES/COMPRESION - USUARIO: ${username}"
+  package_install "zip unzip unrar p7zip lzop cpio"
+  pause_function
+  print_title "AVAHI - USUARIO: ${username}"
+  print_info "Avahi es una implementación gratuita de Zero Configuration Networking (Zeroconf), que incluye un sistema para descubrimiento de multidifusión DNS / DNS-SD. Permite que los programas publiquen y descubran servicios y hosts que se ejecutan en una red local sin una configuración específica."
+  package_install "avahi nss-mdns"
+  is_package_installed "avahi" && system_ctl enable avahi-daemon.service
+  pause_function
+  print_title "ALSA - DRIVER DE SONIDO - USUARIO: ${username}"
+  print_info "La Arquitectura de sonido avanzada de Linux (ALSA) es un componente del kernel de Linux destinado a reemplazar el Sistema de sonido abierto original (OSSv3) para proporcionar controladores de dispositivo para tarjetas de sonido."
+  package_install "alsa-utils alsa-plugins"
+  pause_function
+  print_title "PULSEAUDIO - SERVICIO DE AUDIO - USUARIO: ${username}"
+  print_info "PulseAudio es el servidor de sonido predeterminado que sirve como proxy para las aplicaciones de sonido que utilizan componentes de sonido del núcleo existentes como ALSA u OSS"
+  package_install "pulseaudio pulseaudio-alsa"
+  pause_function
+  print_title "NTFS/FAT/exFAT/F2FS - SISTEMA DE ARCHIVOS - USUARIO: ${username}"
+  print_info "Un sistema de archivos (o sistema de archivos) es un medio para organizar los datos que se espera que se retengan después de que un programa finaliza proporcionando procedimientos para almacenar, recuperar y actualizar datos, así como administrar el espacio disponible en los dispositivos que los contienen. Un sistema de archivos organiza los datos de manera eficiente y se ajusta a las características específicas del dispositivo."
+  package_install "ntfs-3g dosfstools exfat-utils f2fs-tools fuse fuse-exfat autofs mtpfs"
+  pause_function
+  package_install "ntfs-3g dosfstools exfat-utils f2fs-tools fuse fuse-exfat autofs mtpfs"
+  pause_function
+  print_title "SYSTEMD-TIMESYNCD - SINCRONIZACION DE RELOJ POR LA RED - USUARIO: ${username}"
+  print_info "systemd-timesyncd es un servicio que se ha añadido para sincronizar el reloj del sistema a través de la red. Implementa un cliente SNTP"
+  timedatectl set-ntp true
+  pause_function
+}
+salir(){
+  exit 0
+}
+#}}}
+#Seleccionar Usuario{{{
+select_user(){
+  print_title "SELECCIONAR USUARIO"
+  users_list=(`cat /etc/passwd | grep "/home" | cut -d: -f1`);
+  PS3="$prompt1"
+  echo "Usuarios Disponibles:"
+  if [[ $(( ${#users_list[@]} )) -gt 0 ]]; then
+    print_warning "ADVERTENCIA: EL USUARIO SELECCIONADO DEBE TENER PRIVILEGIOS SUDO"
+  else
+    echo ""
+  fi
+  select OPT in "${users_list[@]}"; do
+    if contains_element "$OPT" "${users_list[@]}"; then
+      username=$OPT
+    else
+      invalid_option
+    fi
+    [[ -n $OPT ]] && break
+  done
+}
+#}}}
+#Instalar servicio de impresion{{{
+instalar_impresoras(){
+  print_title "SERVICIO DE IMPRESION CUPS - USUARIO: ${username}"
+  print_info "CUPS es el sistema de impresión de código abierto basado en estándares desarrollado por Apple Inc. para Mac OS X y otros sistemas operativos similares a UNIX."
+  read_input_text "Instalar CUPS? " $CUPS
+  if [[ $OPTION == s ]]; then
+    package_install "cups cups-pdf ghostscript gsfonts"
+    package_install "gutenprint foomatic-db foomatic-db-engine foomatic-db-nonfree foomatic-db-ppds foomatic-db-nonfree-ppds foomatic-db-gutenprint-ppds"
+    package_install "splix system-config-printer"
+    system_ctl enable org.cups.cupsd.service
+    pause_function
+  fi
+}
+#}}}
+check_root
+check_archlinux
+check_hostname
+check_pacman_blocked
+check_multilib
+pacman_key
+select_user
+instalar_basicos
+instalar_impresoras
+salir

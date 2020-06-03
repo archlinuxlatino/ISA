@@ -1,0 +1,248 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+if [[ -f `pwd`/functions ]]; then
+  source functions
+else
+  echo "Archivo no disponible: functions"
+  exit 1
+fi
+#ARCHLINUX U INSTALL {{{
+#WELCOME {{{
+welcome(){
+  clear
+  echo -e "${Bold}CREAR USUARIOS${White}"
+  print_line
+  echo "Requerimientos:"
+  echo "-> Instalacion Sistema Base ArchLinux"
+  echo "-> Ejecutar Instalador como usuario root"
+  echo "-> Conexión a Internet"
+  print_line
+  echo "Para Cancelar la Instalacion Precione CTRL+C"
+  echo "http://www.github.com/archlinuxlatino/ASI"
+  echo "visita nuestras redes @archlinuxlatino"
+  print_line
+  echo -e "\nCopias de Seguridad:"
+  print_line
+  # backup old configs
+  [[ ! -f /etc/pacman.conf.backup ]] && cp -v /etc/pacman.conf /etc/pacman.conf.backup || echo "/etc/pacman.conf.backup";
+  [[ -f /etc/ssh/sshd_config.backup ]] && echo "/etc/ssh/sshd_conf.backup";
+  [[ -f /etc/sudoers.backup ]] && echo "/etc/sudoers.backup";
+  pause_function
+  echo ""
+}
+#}}}
+#SELECT/CREATE USER {{{
+select_user(){
+  #CREATE NEW USER {{{
+  create_new_user(){
+    read -p "Nombre Usuario: " username
+    username=`echo $username | tr '[:upper:]' '[:lower:]'`
+    useradd -m -g users -G wheel,optical,audio,lp,storage,video,games,power,scanner -s /bin/bash ${username}
+    chfn ${username}
+    passwd ${username}
+    while [[ $? -ne 0 ]]; do
+      passwd ${username}
+    done
+    pause_function
+    configure_user_account
+  }
+  #}}}
+  #CONFIGURE USER ACCOUNT {{{
+  configure_user_account(){
+    #BASHRC {{{
+    print_title "BASHRC - https://wiki.archlinux.org/index.php/Bashrc"
+    bashrc_list=(".bashrc from github" "Vanilla .bashrc" "Get personal .bashrc from github");
+    PS3="$prompt1"
+    echo -e "Cambie su .bashrc\n"
+    select OPT in "${bashrc_list[@]}"; do
+      case "$REPLY" in
+        1)
+          package_install "git"
+          package_install "colordiff"
+          git clone https://github.com/archlinuxlatino/dotfiles
+          cp dotfiles/.bashrc dotfiles/.dircolors dotfiles/.dircolors_256 dotfiles/.nanorc dotfiles/.yaourtrc ~/
+          cp dotfiles/.bashrc dotfiles/.dircolors dotfiles/.dircolors_256 dotfiles/.nanorc dotfiles/.yaourtrc /home/${username}/
+          rm -fr dotfiles
+          ;;
+        2)
+          cp /etc/skel/.bashrc /home/${username}
+          ;;
+        3)
+          package_install "git"
+          read -p "Ingrese su Usuario de github [ex: archlinuxlatino]: " GITHUB_USER
+          read -p "Ingrese su Repositorio github  [ex: ISA]: " GITHUB_REPO
+          git clone https://github.com/$GITHUB_USER/$GITHUB_REPO
+          cp -R $GITHUB_REPO/.* /home/${username}/
+          rm -fr $GITHUB_REPO
+          ;;
+        *)
+          invalid_option
+          ;;
+      esac
+      [[ -n $OPT ]] && break
+    done
+    #}}}
+    #EDITOR {{{
+    print_title "DEFAULT EDITOR"
+    editors_list=("emacs" "nano" "vi" "vim" "neovim" "zile");
+    PS3="$prompt1"
+    echo -e "Select editor\n"
+    select EDITOR in "${editors_list[@]}"; do
+      if contains_element "$EDITOR" "${editors_list[@]}"; then
+        if [[ $EDITOR == vim || $EDITOR == neovim ]]; then
+          [[ $EDITOR == vim ]] && (! is_package_installed "gvim" && package_install "vim ctags") || package_install "neovim python2-neovim python-neovim xclip"
+          #VIMRC {{{
+          if [[ ! -f /home/${username}/.vimrc ]]; then
+            vimrc_list=(".vimrc from github" "Vanilla .vimrc" "Get personal .vimrc from github");
+            PS3="$prompt1"
+            echo -e "Choose your .vimrc\n"
+            select OPT in "${vimrc_list[@]}"; do
+              case "$REPLY" in
+                1)
+                  package_install "git"
+                  git clone https://github.com/archlinuxlatino/vim /home/${username}/.vim
+                  ln -sf /home/${username}/.vim/vimrc /home/${username}/.vimrc
+                  cp -R vim /home/${username}/.vim/fonts /home/${username}/.fonts
+                  GRUVBOX_NEEDED=1
+                  ;;
+                3)
+                  package_install "git"
+                  read -p "Ingrese su usuario de github [ex: archlinuxlatino]: " GITHUB_USER
+                  read -p "Ingrese su repositorio [ex: vim]: " GITHUB_REPO
+                  git clone https://github.com/$GITHUB_USER/$GITHUB_REPO
+                  cp -R $GITHUB_REPO/.vim /home/${username}/
+                  if [[ -f $GITHUB_REPO/vimrc ]]; then
+                    ln -sf /home/${username}/.vim/vimrc /home/${username}/.vimrc
+                  else
+                    ln -sf /home/${username}/.vim/.vimrc /home/${username}/.vimrc
+                  fi
+                  rm -fr $GITHUB_REPO
+                  ;;
+                2)
+                  echo "Nada que hacer..."
+                  ;;
+                *)
+                  invalid_option
+                  ;;
+              esac
+              [[ -n $OPT ]] && break
+            done
+          fi
+          if [[ $EDITOR == neovim  && ! -f /home/${username}/.config/nvim ]]; then
+            mkdir ~/.config
+            ln -s ~/.vim ~/.config/nvim
+            ln -s ~/.vimrc ~/.config/nvim/init.vim
+          fi
+          #}}}
+        elif [[ $EDITOR == emacs ]]; then
+            package_install "emacs"
+            #.emacs.d{{{
+            if [[ ! -d /home/${username}/.emacs.d && ! -f /home/${username}/.emacs ]]; then
+                emacsd_list=("Spacemacs" "Centaur Emacs" "Vanilla .emacs.d" "Get personal .emacs.d from github");
+                PS3="$prompt1"
+                echo -e "Choose your .emacs.d\n"
+                select OPT in "${emacsd_list[@]}"; do
+                    case "$REPLY" in
+                        1)
+                            package_install "git"
+                            git clone https://github.com/syl20bnr/spacemacs /home/${username}/.emacs.d
+                            ;;
+                        2)
+                            package_install "git"
+                            git clone --depth 1 https://github.com/seagle0128/.emacs.d.git /home/${username}/.emacs.d
+                            ;;
+                        4)
+                            package_install "git"
+                            read -p "Ingrese su usuario de git [ex: archlinuxlatino]: " GITHUB_USER
+                            read -p "Ingrese su repositorio de  github [ex: vim]: " GITHUB_REPO
+                            git clone https://github.com/$GITHUB_USER/$GITHUB_REPO /home/${username}/.emacs.d
+                            ;;
+                        2)
+                            echo "Nothing to do..."
+                            ;;
+                        *)
+                            invalid_option
+                            ;;
+                    esac
+                    [[ -n $OPT ]] && break
+                done
+            fi
+            #}}}
+        else
+            package_install "$EDITOR"
+        fi
+             break
+      else
+        invalid_option
+      fi
+    done
+    #}}}
+    chown -R ${username}:users /home/${username}
+  }
+  #}}}
+  print_title "SELECCIONAR/CREAR USUARIO"
+  users_list=(`cat /etc/passwd | grep "/home" | cut -d: -f1`);
+  PS3="$prompt1"
+  echo "Usuarios Disponibles:"
+  if [[ $(( ${#users_list[@]} )) -gt 0 ]]; then
+    print_warning "ADVERTENCIA: EL USUARIO SELECCIONADO DEBE TENER PRIVILEGIOS SUDO"
+  else
+    echo ""
+  fi
+  select OPT in "${users_list[@]}" "Crear Nuevo Usuario"; do
+    if [[ $OPT == "Crear Nuevo Usuario" ]]; then
+      create_new_user
+    elif contains_element "$OPT" "${users_list[@]}"; then
+      username=$OPT
+    else
+      invalid_option
+    fi
+    [[ -n $OPT ]] && break
+  done
+  [[ ! -f /home/${username}/.bashrc ]] && configure_user_account;
+  if [[ -n "$http_proxy" ]]; then
+    echo "proxy = $http_proxy" > /home/${username}/.curlrc
+    chown ${username}:users /home/${username}/.curlrc
+  fi
+}
+#}}}
+#CONFIGURE SUDO {{{
+configure_sudo(){
+  if ! is_package_installed "sudo" ; then
+    print_title "SUDO - USUARIO ADMINISTRADOR"
+    package_install "sudo"
+  fi
+  #CONFIGURE SUDOERS {{{
+  if [[ ! -f  /etc/sudoers.backup ]]; then
+    cp -v /etc/sudoers /etc/sudoers.backup
+    sed -i '/%wheel ALL=(ALL) ALL/s/^#//' /etc/sudoers
+
+    echo "" >> /etc/sudoers
+    echo 'Defaults !requiretty, !tty_tickets, !umask' >> /etc/sudoers
+    echo 'Defaults visiblepw, path_info, insults, lecture=always' >> /etc/sudoers
+    echo 'Defaults loglinelen=0, logfile =/var/log/sudo.log, log_year, log_host, syslog=auth' >> /etc/sudoers
+    echo 'Defaults passwd_tries=3, passwd_timeout=1' >> /etc/sudoers
+    echo 'Defaults env_reset, always_set_home, set_home, set_logname' >> /etc/sudoers
+    echo 'Defaults !env_editor, editor="/usr/bin/vim:/usr/bin/vi:/usr/bin/nano"' >> /etc/sudoers
+    echo 'Defaults timestamp_timeout=15' >> /etc/sudoers
+    echo 'Defaults passprompt="[sudo] password for %u: "' >> /etc/sudoers
+    echo 'Defaults lecture=never' >> /etc/sudoers
+  fi
+  #}}}
+}
+#}}}
+#FINISH {{{
+finish(){
+  print_title "CREACION DE USUARIO COMPLETA..."
+  read -p "Salir(s)/Siguiente(n)[s/N]: " OPTION
+  [[ $OPTION == s ]] && exit 0
+  #exit 0
+  ./setuparch
+}
+#}}}
+welcome
+check_root
+configure_sudo
+select_user
+finish
+#}}}

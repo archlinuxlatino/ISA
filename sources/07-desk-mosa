@@ -1,0 +1,70 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+if [[ -f `pwd`/functions ]]; then
+  source functions
+else
+  echo "Archivo no disponible: functions"
+  exit 1
+fi
+
+
+#AWESOME {{{
+print_title "ESCRITORIO AWESOME "
+print_info "Awesome es un administrador de ventanas de framework de próxima generación altamente configurable para X. Es muy rápido, extensible y tiene licencia bajo la licencia GNU GPLv2."
+package_install "awesome"
+package_install "lxappearance"
+package_install "leafpad epdfview nitrogen"
+if [[ ! -d /home/${username}/.config/awesome/ ]]; then
+  mkdir -p /home/${username}/.config/awesome/
+  cp /etc/xdg/awesome/rc.lua /home/${username}/.config/awesome/
+  chown -R ${username}:users /home/${username}/.config
+fi
+# config xinitrc
+config_xinitrc "awesome"
+pause_function
+install_misc_apps "AWESOME"
+install_themes "AWESOME"
+;;
+#}}}
+
+#FLUXBOX {{{
+print_title "ESCRITORIO FLUXBOX "
+print_info "Fluxbox es otro administrador de ventanas para X11. Se basa en el código Blackbox 0.61.1 (ahora abandonado), pero con mejoras significativas y un desarrollo continuo. Fluxbox es muy ligero en recursos y rápido, pero proporciona herramientas interesantes de administración de ventanas, como tabulación y agrupación."
+package_install "fluxbox menumaker"
+package_install "lxappearance"
+package_install "leafpad epdfview"
+# config xinitrc
+config_xinitrc "startfluxbox"
+install_misc_apps "FLUXBOX"
+install_themes "FLUXBOX"
+pause_function
+;;
+#}}}
+
+#I3 {{{
+print_title "ESCRITORIO I3"
+print_info "I3 es un administrador de ventanas de mosaico dinámico inspirado en wmii que está dirigido principalmente a desarrolladores y usuarios avanzados. Los objetivos establecidos para I3 incluyen documentación clara, soporte adecuado para múltiples monitores"
+package_install "i3"
+package_install "dmenu"
+# config xinitrc
+config_xinitrc "i3"
+pause_function
+install_misc_apps "i3"
+install_themes "i3"
+;;
+#}}}
+
+#OPENBOX {{{
+print_title "ESCRITORIO OPENBOX"
+print_info "Openbox es un administrador de ventanas ligero y altamente configurable con amplio soporte de estándares."
+package_install "openbox obconf obmenu menumaker"
+package_install "lxappearance"
+package_install "leafpad epdfview nitrogen"
+mkdir -p /home/${username}/.config/openbox/
+cp /etc/xdg/openbox/{menu.xml,rc.xml,autostart} /home/${username}/.config/openbox/
+chown -R ${username}:users /home/${username}/.config
+# config xinitrc
+config_xinitrc "openbox-session"
+pause_function
+install_misc_apps "OPENBOX"
+install_themes "OPENBOX"

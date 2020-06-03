@@ -1,0 +1,97 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+
+if [[ -f `pwd`/functions ]]; then
+  source functions
+else
+  echo "Archivo no disponible: functions"
+  exit 1
+fi
+#AUR HELPER {{{
+instalar_aur(){
+  print_title "INSTALADORES DEL REPOSITORIO DE LA COMUNIDAD AUR"
+  print_info "AUR Los ayudantes están escritos para hacer que el uso del Arch User Repository sea más cómodo."
+  print_warning "\tNinguna de estas herramientas es oficialmente compatible con los desarrolladores de Arch."
+  print_warning "USUARIO: ${username}"
+  aurhelper=("pikaur" "yay" "Salir")
+  PS3="$prompt1"
+  echo -e "Escoge cual de los Instaladores de AUR Prefieres\n"
+  select OPT in "${aurhelper[@]}"; do
+    case "$REPLY" in
+      1)
+        if ! is_package_installed "pikaur" ; then
+          package_install "base-devel git"
+          git clone https://aur.archlinux.org/pikaur.git
+          (
+            cd pikaur || exit
+            makepkg -fsri
+          )
+          rm -rf pikaur
+          if ! is_package_installed "pikaur" ; then
+            echo "pikaur no instalada. Salida Ahora"
+            pause_function
+            exit 0
+          fi
+        fi
+        AUR_PKG_MANAGER="pikaur"
+        ;;
+      2)
+        if ! is_package_installed "yay" ; then
+          package_install "base-devel git go"
+          pacman -D --asdeps go
+          isa_download_packages "yay"
+          if ! is_package_installed "yay" ; then
+            echo "yay no instalada. Salida Ahora"
+            pause_function
+            exit 0
+          fi
+        fi
+        AUR_PKG_MANAGER="yay"
+        ;;
+      3)
+        salir
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+    [[ -n $OPT ]] && break
+  done
+  pause_function
+}
+#}}}
+salir(){
+  exit 0
+}
+#Seleccionar Usuario{{{
+select_user(){
+  print_title "SELECCIONAR USUARIO"
+  users_list=(`cat /etc/passwd | grep "/home" | cut -d: -f1`);
+  PS3="$prompt1"
+  echo "Usuarios Disponibles:"
+  if [[ $(( ${#users_list[@]} )) -gt 0 ]]; then
+    print_warning "ADVERTENCIA: EL USUARIO SELECCIONADO DEBE TENER PRIVILEGIOS SUDO"
+  else
+    echo ""
+  fi
+  select OPT in "${users_list[@]}"; do
+    if contains_element "$OPT" "${users_list[@]}"; then
+      username=$OPT
+    else
+      invalid_option
+    fi
+    [[ -n $OPT ]] && break
+  done
+}
+#}}}
+check_root
+check_archlinux
+check_hostname
+check_pacman_blocked
+check_multilib
+pacman_key
+check_connection
+select_user
+instalar_aur
+pause_function
+salir

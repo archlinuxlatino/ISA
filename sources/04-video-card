@@ -1,0 +1,213 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+if [[ -f `pwd`/functions ]]; then
+  source functions
+else
+  echo "Archivo no disponible: functions"
+  exit 1
+fi
+#Seleccionar Usuario{{{
+select_user(){
+  print_title "SELECCIONAR USUARIO"
+  users_list=(`cat /etc/passwd | grep "/home" | cut -d: -f1`);
+  PS3="$prompt1"
+  echo "Usuarios Disponibles:"
+  if [[ $(( ${#users_list[@]} )) -gt 0 ]]; then
+    print_warning "ADVERTENCIA: EL USUARIO SELECCIONADO DEBE TENER PRIVILEGIOS SUDO"
+  else
+    echo ""
+  fi
+  select OPT in "${users_list[@]}"; do
+    if contains_element "$OPT" "${users_list[@]}"; then
+      username=$OPT
+    else
+      invalid_option
+    fi
+    [[ -n $OPT ]] && break
+  done
+}
+#}}}
+#DIVER VIDEO {{{
+create_ramdisk_environment(){
+  if [ "$(ls /boot | grep hardened -c)" -gt "0" ]; then
+    mkinitcpio -p linux-hardened
+  elif [ "$(ls /boot | grep lts -c)" -gt "0" ]; then
+    mkinitcpio -p linux-lts
+  elif [ "$(ls /boot | grep zen -c)" -gt "0" ]; then
+    mkinitcpio -p linux-zen
+  else
+    mkinitcpio -p linux
+  fi
+}
+instalar_video_cards(){
+  package_install "dmidecode"
+  print_title "TARJETA DE VIDEO"
+  check_vga
+  #Virtualbox {{{
+  if [[ ${VIDEO_DRIVER} == virtualbox ]]; then
+    if [ "$(lspci | grep 'VMware SVGA' -c)" -gt "0" ]; then
+      package_install "xf86-video-vmware"
+    fi
+    if [ "$(ls /boot | grep hardened -c)" -gt "0" ] || [ "$(ls /boot | grep lts -c)" -gt "0" ] || [ "$(ls /boot | grep zen -c)" -gt "0" ]; then
+      package_install "virtualbox-guest-dkms virtualbox-guest-utils mesa-libgl"
+    else
+      package_install "virtualbox-guest-modules-arch virtualbox-guest-utils mesa-libgl"
+    fi
+    add_module "vboxguest vboxsf vboxvideo" "virtualbox-guest"
+    add_user_to_group ${username} vboxsf
+    system_ctl enable vboxservice
+    create_ramdisk_environment
+  #}}}
+  #VMware {{{
+  elif [[ ${VIDEO_DRIVER} == vmware ]]; then
+    package_install "xf86-video-vmware xf86-input-vmmouse"
+    if [ "$(ls /boot | grep hardened -c)" -gt "0" ] || [ "$(ls /boot | grep lts -c)" -gt "0" ]|| [ "$(ls /boot | grep zen -c)" -gt "0" ]; then
+      aur_package_install "open-vm-tools-dkms"
+    else
+      package_install "open-vm-tools"
+    fi
+    cat /proc/version > /etc/arch-release
+    system_ctl enable vmtoolsd
+    create_ramdisk_environment
+  #}}}
+  #Bumblebee {{{
+  elif [[ ${VIDEO_DRIVER} == bumblebee ]]; then
+    XF86_DRIVERS=$(pacman -Qe | grep xf86-video | awk '{print $1}')
+    [[ -n $XF86_DRIVERS ]] && pacman -Rcsn $XF86_DRIVERS
+    pacman -S --needed xf86-video-intel bumblebee nvidia
+    [[ ${ARCHI} == x86_64 ]] && pacman -S --needed lib32-virtualgl lib32-nvidia-utils
+    replace_line '*options nouveau modeset=1' '#options nouveau modeset=1' /etc/modprobe.d/modprobe.conf
+    replace_line '*MODULES="nouveau"' '#MODULES="nouveau"' /etc/mkinitcpio.conf
+    create_ramdisk_environment
+    add_user_to_group ${username} bumblebee
+  #}}}
+  #NVIDIA {{{
+  elif [[ ${VIDEO_DRIVER} == nvidia ]]; then
+    XF86_DRIVERS=$(pacman -Qe | grep xf86-video | awk '{print $1}')
+    [[ -n $XF86_DRIVERS ]] && pacman -Rcsn $XF86_DRIVERS
+    if [ "$(ls /boot | grep hardened -c)" -gt "0" ] || [ "$(ls /boot | grep lts -c)" -gt "0" ] || [ "$(ls /boot | grep zen -c)" -gt "0" ]; then
+      package_install "nvidia-dkms nvidia-utils libglvnd"
+      echo "Debes hacer un mkinitcpio cada vez que actualices el controlador de nvidia!, Ejecutando <mkinitcpio -p linux-version>"
+    else
+      package_install "nvidia nvidia-utils libglvnd"
+    fi
+    [[ ${ARCHI} == x86_64 ]] && pacman -S --needed lib32-nvidia-utils
+    replace_line '*options nouveau modeset=1' '#options nouveau modeset=1' /etc/modprobe.d/modprobe.conf
+    replace_line '*MODULES="nouveau"' '#MODULES="nouveau"' /etc/mkinitcpio.conf
+    create_ramdisk_environment
+    nvidia-xconfig --add-argb-glx-visuals --allow-glx-with-composite --composite --render-accel -o /etc/X11/xorg.conf.d/20-nvidia.conf;
+  #}}}
+  #Nouveau [NVIDIA] {{{
+  elif [[ ${VIDEO_DRIVER} == nouveau ]]; then
+    is_package_installed "nvidia" && pacman -Rdds --noconfirm nvidia{,-utils}
+    [[ ${ARCHI} == x86_64 ]] && is_package_installed "lib32-nvidia-utils" && pacman -Rdds --noconfirm lib32-nvidia-utils
+    [[ -f /etc/X11/xorg.conf.d/20-nvidia.conf ]] && rm /etc/X11/xorg.conf.d/20-nvidia.conf
+    package_install "xf86-video-${VIDEO_DRIVER} mesa-libgl libvdpau-va-gl"
+    replace_line '#*options nouveau modeset=1' 'options nouveau modeset=1' /etc/modprobe.d/modprobe.conf
+    replace_line '#*MODULES="nouveau"' 'MODULES="nouveau"' /etc/mkinitcpio.conf
+    create_ramdisk_environment
+  #}}}
+  #ATI {{{
+  elif [[ ${VIDEO_DRIVER} == ati ]]; then
+    [[ -f /etc/X11/xorg.conf.d/20-radeon.conf ]] && rm /etc/X11/xorg.conf.d/20-radeon.conf
+    [[ -f /etc/X11/xorg.conf ]] && rm /etc/X11/xorg.conf
+    package_install "xf86-video-${VIDEO_DRIVER} mesa-libgl mesa-vdpau libvdpau-va-gl"
+    add_module "radeon" "ati"
+    create_ramdisk_environment
+  #}}}
+  #AMDGPU {{{
+  elif [[ ${VIDEO_DRIVER} == amdgpu ]]; then
+    [[ -f /etc/X11/xorg.conf.d/20-radeon.conf ]] && rm /etc/X11/xorg.conf.d/20-radeon.conf
+    [[ -f /etc/X11/xorg.conf ]] && rm /etc/X11/xorg.conf
+    package_install "xf86-video-${VIDEO_DRIVER} vulkan-radeon mesa-libgl mesa-vdpau libvdpau-va-gl"
+    add_module "amdgpu radeon" "ati"
+    create_ramdisk_environment
+  #}}}
+  #Intel {{{
+  elif [[ ${VIDEO_DRIVER} == intel ]]; then
+    package_install "xf86-video-${VIDEO_DRIVER} mesa-libgl intel-ucode intel-media-driver libva-intel-driver"
+  #}}}
+  #Vesa {{{
+  else
+    package_install "xf86-video-${VIDEO_DRIVER} mesa-libgl libvdpau-va-gl"
+  fi
+  #}}}
+  if [[ ${ARCHI} == x86_64 ]]; then
+    is_package_installed "mesa-libgl" && package_install "lib32-mesa-libgl"
+    is_package_installed "mesa-vdpau" && package_install "lib32-mesa-vdpau"
+  fi
+  if is_package_installed "libvdpau-va-gl"; then
+    add_line "export VDPAU_DRIVER=va_gl" "/etc/profile"
+  fi
+  pause_function
+}
+#}}}
+#XORG {{{
+instalar_xorg(){
+  print_title "XORG - Servicio de Administrador de Ventanas"
+  print_info "Xorg es la implementación pública de código abierto del sistema X Window versión 11."
+  echo "Instalando X-Server (req. para entorno de escritorio, controladores de GPU, diseño de teclado.)"
+  package_install "xorg-server xorg-xinit xorg-xkill xorg-xinput xf86-input-libinput"
+  package_install "mesa mesa-demos"
+  modprobe uinput
+  pause_function
+}
+#}}}
+#WAYLAND {{{
+instalar_wayland(){
+  print_title "WAYLAND - Servicio de Administrador de Ventanas "
+  print_info "Wayland es un protocolo para un administrador de ventanas de composición para hablar con sus clientes, así como una biblioteca que implementa el protocolo. "
+  package_install "weston xorg-server-xwayland"
+  pause_function
+}
+#}}}
+if is_package_installed "xorg-server-xwayland"; then WAY=1; fi
+if is_package_installed "xorg-server"; then XORG=1;fi
+#SAlir{{{
+salir(){
+  exit 0
+}
+#}}}
+check_root
+check_archlinux
+check_hostname
+check_pacman_blocked
+check_multilib
+pacman_key
+select_user
+while true
+do
+  print_title "INSTALACION DE TARJETA GRAFICA/XORG/WAYLAND"
+  print_warning "USUARIO: ${username}"
+  echo " "
+  echo " 1) $(mainmenu_item "${checklist[1]}" "Instalar Targeta Grafica" ${VIDEO_DRIVER})"
+  echo " 2) $(mainmenu_item "${checklist[2]}" "Instalar Servidor Grafico XORG" "$([[ ${XORG} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
+  echo " 3) $(mainmenu_item "${checklist[3]}" "Instalar Servidor Grafico WAYLAND" "$([[ ${WAY} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
+  echo ""
+  echo " s) Salir"
+  echo " "
+  MAINMENU+=" s"
+  read_input_options "$MAINMENU"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        instalar_video_cards
+        checklist[1]=1
+        ;;
+      2)
+        instalar_xorg
+        checklist[1]=1
+        ;;
+      3)
+        instalar_wayland
+        checklist[1]=1
+        ;;
+      "s")
+        salir
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+done

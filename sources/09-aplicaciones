@@ -1,0 +1,1199 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+if [[ -f `pwd`/functions ]]; then
+  source functions
+else
+  echo "Archivo no disponible: functions"
+  exit 1
+fi
+#Bienvenidos{{{
+bienvenidos(){
+  clear
+  echo -e "${Bold}BIENVENIDOS AL INSTALADOR DE LAS APLICACIONES MAS USADAS${White}"
+  print_line
+  echo "Requerimientos:"
+  echo "-> Instalacion Sistema Base ArchLinux y Escritorio"
+  echo "-> Ejecutar Instalador como usuario root"
+  echo "-> Conexión a Internet"
+  print_line
+  echo -e "\nCopias de Seguridad:"
+  print_line
+  # backup old configs
+  [[ ! -f /etc/pacman.conf.backup ]] && cp -v /etc/pacman.conf /etc/pacman.conf.backup || echo "/etc/pacman.conf.backup";
+  [[ -f /etc/ssh/sshd_config.backup ]] && echo "/etc/ssh/sshd_conf.backup";
+  [[ -f /etc/sudoers.backup ]] && echo "/etc/sudoers.backup";
+  pause_function
+  echo ""
+}
+#}}}
+#Seleccionar Usuario{{{
+select_user(){
+  print_title "SELECCIONAR USUARIO"
+  users_list=(`cat /etc/passwd | grep "/home" | cut -d: -f1`);
+  PS3="$prompt1"
+  echo "Usuarios Disponibles:"
+  if [[ $(( ${#users_list[@]} )) -gt 0 ]]; then
+    print_warning "ADVERTENCIA: EL USUARIO SELECCIONADO DEBE TENER PRIVILEGIOS SUDO"
+  else
+    echo ""
+  fi
+  select OPT in "${users_list[@]}"; do
+    if contains_element "$OPT" "${users_list[@]}"; then
+      username=$OPT
+    else
+      invalid_option
+    fi
+    [[ -n $OPT ]] && break
+  done
+}
+#}}}
+#Paquetes Comunes{{{
+instalar_comunes(){
+  if is_package_installed "libmtp" ; then
+    package_install "gvfs-mtp"
+  fi
+  #}}}
+  if [[ ${KDE} -eq 0 ]]; then
+    package_install "gvfs gvfs-goa gvfs-afc gvfs-mtp gvfs-google"
+    package_install "xdg-user-dirs-gtk xdg-user-dirs"
+    package_install "pavucontrol"
+    package_install "ttf-bitstream-vera ttf-dejavu"
+    is_package_installed "cups" && package_install "gtk3-print-backends"
+    is_package_installed "samba" && package_install "gvfs-smb"
+  fi
+  #}}}
+  #COMMON CONFIG {{{
+  # speed up application startup
+  mkdir -p ~/.compose-cache
+  # D-Bus interface for user account query and manipulation
+  system_ctl enable accounts-daemon
+  xdg-user-dirs-update
+  # Improvements
+  add_line "fs.inotify.max_user_watches = 524288" "/etc/sysctl.d/99-sysctl.conf"
+  add_line "vm.swappiness = 68" "/etc/sysctl.d/99-sysctl.conf"
+  add_line "vm.vfs_cache_pressure = 50" "/etc/sysctl.d/99-sysctl.conf"
+  add_line "vm.watermark_scale_factor = 200" "/etc/sysctl.d/99-sysctl.conf"
+  add_line "vm.dirty_ratio = 3" "/etc/sysctl.d/99-sysctl.conf"
+}
+#}}}
+#ZSH {{{
+instalar_zsh(){
+  print_title "ZSH - Shell Interectivo"
+  print_info "Zsh es un potente shell que funciona como un shell interactivo y como un intérprete de lenguaje de script. "
+  read_input_text "Instalar zsh" $ZSH
+  if [[ $OPTION == y ]]; then
+    package_install "zsh"
+    read_input_text "Instalar oh-my-zsh?" $OH_MY_ZSH
+    if [[ $OPTION == y ]]; then
+      if [[ -f /home/${username}/.zshrc ]]; then
+        read_input_text "Reemplazar el archivo .zshrc actual"
+        if [[ $OPTION == y ]]; then
+          run_as_user "mv /home/${username}/.zshrc /home/${username}/.zshrc.bkp"
+          run_as_user "sh -c \"$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)\""
+          run_as_user "$EDITOR /home/${username}/.zshrc"
+        fi
+      else
+        run_as_user "sh -c \"$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)\""
+        run_as_user "$EDITOR /home/${username}/.zshrc"
+      fi
+    fi
+    pause_function
+  fi
+}
+#}}}
+#Aplicaciones_Accesorios{{{
+instalar_app_accesorios(){
+  print_title " INSTALACION DE ACCESORIOS"
+  print_warning "Usuario: ${username}"
+  echo ""
+  echo " 1) $(menu_item "albert" "Teclado en Pantalla albert")"
+  echo " 2) $(menu_item "catfish" "Búsqueda de archivos catfish")"
+  echo " 3) $(menu_item "conky" "conky")"
+  echo " 4) $(menu_item "keepass" "Administrador de contraseñas keepass")"
+  echo " 5) $(menu_item "pamac-aur" "Gestor de Paquetes Pamac") $AUR"
+  echo " 6) $(menu_item "tilix-bin" "terminator" "Emulador de Terminal terminator")"
+  echo " 7) $(menu_item "meld" "Compara Archivo/Directorios meld")"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  ACCESSORIES_OPTIONS+=" s"
+  read_input_options "$ACCESSORIES_OPTIONS"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        package_install "albert"
+        ;;
+      2)
+        package_install "catfish"
+        ;;
+      3)
+        package_install "conky"
+        package_install "lm_sensors"
+        sensors-detect --auto
+        ;;
+      4)
+        package_install "keepass"
+        ;;
+      5)
+        aur_package_install "pamac-aur"
+        ;;
+      6)
+        package_install "terminator"
+        ;;
+      7)
+        package_install "meld"
+        ;;
+      "s")
+         break
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  source sharedfuncs_elihw
+}
+#}}}
+#Aplicaciones_audio{{{
+instalar_app_audio(){
+  print_title "AUDIO REPRODUCCION/EDICION"
+  print_warning "Usuario: ${username}"
+  echo ""
+  echo " 1) $(menu_item "amarok")"
+  echo " 2) $(menu_item "audacious")"
+  echo " 3) $(menu_item "clementine")"
+  echo " 4) $(menu_item "deadbeef")"
+  echo " 5) $(menu_item "guayadeque") $AUR"
+  echo " 6) $(menu_item "musique") $AUR"
+  echo " 7) $(menu_item "pragha")"
+  echo " 8) $(menu_item "rhythmbox")"
+  echo " 9) $(menu_item "spotify") $AUR"
+  echo "10) $(menu_item "timidity++") $AUR"
+  echo "11) $(menu_item "quodlibet")"
+  echo "12) $(menu_item "audacity")"
+  echo "13) $(menu_item "easytag")"
+  echo "14) $(menu_item "ocenaudio-bin") $AUR"
+  echo "15) $(menu_item "soundconverter soundkonverter" "$([[ ${KDE} -eq 1 ]] && echo "Soundkonverter" || echo "Soundconverter";)")"
+  echo "16) $(menu_item "gst-plugins-base" "Codecs")"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  AUDIO_OPTIONS+=" s"
+  read_input_options "$AUDIO_OPTIONS"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        package_install "amarok"
+        ;;
+      2)
+        package_install "audacious audacious-plugins"
+        ;;
+      3)
+        package_install "clementine"
+        ;;
+      4)
+        package_install "deadbeef"
+        ;;
+      5)
+        aur_package_install "guayadeque"
+        ;;
+      6)
+        aur_package_install "musique"
+        ;;
+      7)
+        package_install "pragha"
+        ;;
+      8)
+        package_install "rhythmbox grilo grilo-plugins libgpod libdmapsharing gnome-python python-mako"
+        ;;
+      9)
+        aur_package_install "spotify ffmpeg-compat ffmpeg-compat-57"
+        ;;
+      10)
+        aur_package_install "timidity++ fluidr3"
+        echo -e 'soundfont /usr/share/soundfonts/fluidr3/FluidR3GM.SF2' >> /etc/timidity++/timidity.cfg
+      ;;
+      11)
+        package_install "quodlibet"
+        ;;
+      12)
+        package_install "audacity"
+        ;;
+      13)
+        package_install "easytag"
+        ;;
+      14)
+        aur_package_install "ocenaudio-bin"
+        ;;
+      15)
+        if [[ ${KDE} -eq 1 ]]; then
+          package_install "soundkonverter"
+        else
+          package_install "soundconverter"
+        fi
+        ;;
+      16)
+        package_install "gst-plugins-base gst-plugins-base-libs gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav"
+        [[ ${KDE} -eq 1 ]] && package_install "phonon-qt5-gstreamer"
+        run_as_user "gconftool-2 --type string --set /system/gstreamer/0.10/audio/profiles/mp3/pipeline \audio/x-raw-int,rate=44100,channels=2 ! lame name=enc preset=1001 ! id3v2mux\""
+        ;;
+      "s")
+        break
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  source sharedfuncs_elihw
+}
+#}}}
+#Aplicaciones_desarrollo{{{
+instalar_app_desarrollo(){
+  print_title "APLICACIONES PARA DESARROLLO"
+  print_warning "USUARIO: ${username}"
+  echo ""
+  echo " 1) $(menu_item "atom" "Editor de Codigo Atom")"
+  echo " 2) $(menu_item "emacs" "Editor Emacs")"
+  echo " 3) $(menu_item "bluefish" "Desarrollo Web Bluefish")"
+  echo " 4) $(menu_item "sublime-text-dev" "Sublime Text 3") $AUR"
+  echo " 5) $(menu_item "sublime-text-4-dev" "Sublime Text 4") $AUR"
+  echo " 6) $(menu_item "android-sdk" "Android Studio") $AUR"
+  echo " 7) $(menu_item "jetbrains-toolbox" "Jetbrains Toolbox") $AUR"
+  echo " 8) $(menu_item "intellij-idea-community-edition" "IntelliJ IDEA Community Edition")"
+  echo " 9) $(menu_item "intellij-idea-ultimate-edition" "IntelliJ IDEA Ultimate Edition") $AUR"
+  echo "10) $(menu_item "monodevelop-stable" "Monodevelop") $AUR"
+  echo "11) $(menu_item "qtcreator" "QTcreator")"
+  echo "12) $(menu_item "mysql-workbench" "MySQL Workbench")"
+  echo "13) $(menu_item "jdk8-openjdk" "OpenJDK 8")"
+  echo "14) $(menu_item "jdk11-openjdk" "OpenJDK 11")"
+  echo "15) $(menu_item "jdk-openjdk" "OpenJDK 14")"
+  echo "16) $(menu_item "jdk" "Oracle JDK") $AUR"
+  echo "17) $(menu_item "nodejs")"
+  echo "18) $(menu_item "visual-studio-code-bin" "Visual Studio Code") $AUR"
+  echo "19) $(menu_item "code" "Studio Code Community")"
+  echo "20) $(menu_item "gitg" "Visor de GIT") $AUR"
+  echo "21) $(menu_item "regexxer" "Herramienta de Busqueda regexxer")"
+  echo "22) $(menu_item "postman-bin" "Postman") $AUR"
+  echo "23) $(menu_item "gitkraken" "El Cliente Git multiplataforma Gitkraken") $AUR"
+  echo "24) $(menu_item "netbeans" "Netbeans 11 Ide Desarrollo")"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  DEVELOPMENT_OPTIONS+=" s"
+  read_input_options "$DEVELOPMENT_OPTIONS"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        package_install "atom"
+        ;;
+      2)
+        package_install "emacs"
+        ;;
+      3)
+        package_install "bluefish"
+        ;;
+      4)
+        aur_package_install "sublime-text-dev"
+        ;;
+      5)
+        aur_package_install "sublime-text-4-dev"
+        ;;
+      6)
+        aur_package_install "android-sdk android-sdk-platform-tools android-sdk-build-tools android-platform"
+        add_user_to_group ${username} sdkusers
+        chown -R :sdkusers /opt/android-sdk/
+        chmod -R g+w /opt/android-sdk/
+        add_line "export ANDROID_HOME=/opt/android-sdk" "/home/${username}/.bashrc"
+        aur_package_install "android-studio"
+        ;;
+      7)
+        aur_package_install "jetbrains-toolbox"
+        ;;
+      8)
+        package_install "intellij-idea-community-edition"
+        ;;
+      9)
+        aur_package_install "intellij-idea-ultimate-edition"
+        ;;
+      10)
+        aur_package_install "monodevelop-stable"
+        ;;
+      11)
+        package_install "qtcreator"
+        ;;
+      12)
+        package_install "mysql-workbench"
+        ;;
+      13)
+        package_remove "jre{7,11}-openjdk"
+        package_remove "jre-openjdk"
+        package_install "jdk8-openjdk"
+        ;;
+      14)
+        package_remove "jre{7,8}-openjdk"
+        package_remove "jre-openjdk"
+        package_install "jdk11-openjdk"
+        ;;
+      15)
+        package_remove "jre{7,8,11}-openjdk"
+        package_install "jdk-openjdk"
+        ;;
+      16)
+        package_remove "jre{7,8,9,10}-openjdk"
+        package_remove "jdk{7,8,9,10}-openjdk"
+        aur_package_install "jdk"
+        ;;
+      17)
+        package_install "nodejs"
+        ;;
+      18)
+        aur_package_install "visual-studio-code-bin"
+        ;;
+      19)
+        package_install "code"
+        ;;
+      20)
+        if [[ ${KDE} -eq 1 ]]; then
+           aur_package_install "qgit"
+        else
+           aur_package_install "gitg"
+        fi
+        ;;
+      21)
+        package_install "regexxer"
+        ;;
+      22)
+        aur_package_install "postman-bin"
+        ;;
+      23)
+        aur_package_install "gitkraken"
+        ;;
+      24)
+        package_install "netbeans"
+        ;;
+      "s")
+        break
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  source sharedfuncs_elihw
+}
+#}}}
+#Aplicaciones_graficos{{{
+instalar_app_graficos(){
+  print_title "UTILIDADES GRAFICAS"
+  print_warning "USUARIO: ${username}"
+  echo ""
+  echo " 1) $(menu_item "blender" "Blender")"
+  echo " 2) $(menu_item "gimp" "Gimp")"
+  echo " 3) $(menu_item "gthumb" "Visor de Imagen Gnome gthumb")"
+  echo " 4) $(menu_item "inkscape" "Inkscape")"
+  echo " 5) $(menu_item "mcomix" "Iamagenes y Comix mcomix")"
+  echo " 6) $(menu_item "mypaint" "Pintura Rapida Mypaint")"
+  echo " 7) $(menu_item "pencil" "Pencil Prototyping Tool") $AUR"
+  echo " 8) $(menu_item "scribus" "Publicaion Scribus")"
+  echo " 9) $(menu_item "shotwell" "Organizador de Fotos Shotwell")"
+  echo "10) $(menu_item "simple-scan" "Lector de Scanner Simple-scan")"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  GRAPHICS_OPTIONS+=" s"
+  read_input_options "$GRAPHICS_OPTIONS"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        package_install "blender"
+        ;;
+      2)
+        package_install "gimp"
+        ;;
+      3)
+        package_install "gthumb"
+        ;;
+      4)
+        package_install "inkscape python2-numpy python-lxml"
+        ;;
+      5)
+        package_install "mcomix"
+        ;;
+      6)
+        package_install "mypaint"
+        ;;
+      7)
+        aur_package_install "pencil"
+        ;;
+      8)
+        package_install "scribus"
+        ;;
+      9)
+        package_install "shotwell"
+        ;;
+      10)
+        package_install "simple-scan"
+        ;;
+      "s")
+        break
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  source sharedfuncs_elihw
+}
+#}}}
+#Aplicaciones_Herramientas{{{
+instalar_app_herramientas(){
+  print_title "HERRAMIENTAS DE SISTEMA"
+  print_warning "USUARIO ${username}"
+  echo ""
+  echo " 1) $(menu_item "clamav" "Clamav Antivirus")"
+  echo " 2) $(menu_item "cockpit" "interface Web Cockpit")"
+  echo " 3) $(menu_item "webmin" "interface Web Webmin") $AUR"
+  echo " 4) $(menu_item "ufw"  "Firewalld")"
+  echo " 5) $(menu_item "gparted" "Gestor de Particiones Gparted")"
+  echo " 6) $(menu_item "grsync" "Copias de Seguridad Grsync")"
+  echo " 7) $(menu_item "hosts-update" "hosts-update") $AUR"
+  echo " 8) $(menu_item "htop" "Visor de Procesos htop")"
+  echo " 9) $(menu_item "firewalld" "Administrador de Firewall ufw")"
+  echo "10) $(menu_item "unified-remote-server" "Unified Remote") $AUR"
+  echo "11) $(menu_item "virtualbox" "virtualbox")"
+  echo "12) $(menu_item "qemu" "Qemu")"
+  echo "13) $(menu_item "wine" "wine")"
+  echo "14) $(menu_item "netdata" "netdata")"
+  echo "15) $(menu_item "nload" "nload")"
+  echo "16) $(menu_item "vmware-workstation12" "VMware Workstation 12") $AUR"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  SYSTEMTOOLS_OPTIONS+=" s"
+  read_input_options "$SYSTEMTOOLS_OPTIONS"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        package_install "clamav"
+        cp /etc/clamav/clamd.conf.sample /etc/clamav/clamd.conf
+        cp /etc/clamav/freshclam.conf.sample /etc/clamav/freshclam.conf
+        sed -i '/Example/d' /etc/clamav/freshclam.conf
+        sed -i '/Example/d' /etc/clamav/clamd.conf
+        system_ctl enable clamd
+        freshclam
+        ;;
+      2)
+        package_install "cockpit ostree"
+        aur_package_install "linux-user-chroot"
+        ;;
+      3)
+        aur_package_install "webmin"
+        ;;
+      4)
+        is_package_installed "ufw" && package_remove "ufw"
+        is_package_installed "firewalld" && package_remove "firewalld"
+        package_install "firewalld"
+        system_ctl enable firewalld
+        ;;
+      5)
+        package_install "gparted"
+        ;;
+      6)
+        package_install "grsync"
+        ;;
+      7)
+        aur_package_install "hosts-update"
+        hosts-update
+        ;;
+      8)
+        package_install "htop"
+        ;;
+      9)
+        print_title "UFW"
+        print_info "Ufw cortafuegos sin complicaciones y es un programa para administrar un cortafuegos de filtro de red. Proporciona una interfaz de línea de comandos y su objetivo es ser sencillo y fácil de usar."
+        is_package_installed "firewalld" && package_remove "firewalld"
+        package_install "ufw gufw"
+        system_ctl enable ufw.service
+        ;;
+      10)
+        aur_package_install "unified-remote-server"
+        system_ctl enable urserver.service
+        ;;
+      11)
+        #Make sure we are not a VirtualBox Guest
+        VIRTUALBOX_GUEST=`dmidecode --type 1 | grep VirtualBox`
+        if [[ -z ${VIRTUALBOX_GUEST} ]]; then
+          package_install "virtualbox virtualbox-host-dkms virtualbox-guest-iso linux-headers"
+          aur_package_install "virtualbox-ext-oracle"
+          add_user_to_group ${username} vboxusers
+          modprobe vboxdrv vboxnetflt
+        else
+          cecho "${BBlue}[${Reset}${Bold}!${BBlue}]${Reset} VirtualBox: no se instalo VirtualBox guest."
+        fi
+        ;;
+      12)
+        package_install "qemu qemu-arch-extra qemu-guest-agent qemu-block-iscsi"
+        if [[ ${KDE} -eq 1 ]]; then
+           aur_package_install "aqemu"
+        else
+           aur_package_install "qemu-launcher"
+        fi
+        ;;
+      13)
+        package_install "icoutils wine wine_gecko wine-mono winetricks"
+        ;;
+      14)
+        package_install "netdata"
+        system_ctl enable netdata.service
+        ;;
+      15)
+        package_install "nload"
+        ;;
+      16)
+        aur_package_install "vmware-workstation12"
+        ;;
+      "s")
+        break
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  source sharedfuncs_elihw
+}
+#}}}
+#Aplicaciones_Internet{{{
+instalar_app_internet(){
+  print_title "INTERNET ==> (Navegadores, Correo, VNC, Messenger, Gestores de Descarga"
+  print_warning " USUARIO: ${username}"
+  echo ""
+  echo " 1) $(menu_item "Navegador Chrome") $AUR"
+  echo " 2) $(menu_item "Navegador Chromium")"
+  echo " 3) $(menu_item "firefox" "Navegador Firefox")"
+  echo " 4) $(menu_item "opera" "Navegador Opera")"
+  echo " 5) $(menu_item "tor-browser" "Navegador Tor browser") $AUR"
+  echo " 6) $(menu_item "$([[ ${KDE} -eq 1 ]] && echo "Navegador Konqueror" || echo "Navegador Midori";)")"
+  echo " 7) $(menu_item "lifera" "Correo Liferea")"
+  echo " 8) $(menu_item "thunderbird" "Correo Thunderbird")"
+  echo " 9) $(menu_item "$([[ ${KDE} -eq 1 ]] && echo "Bitorrent Transmission-Qt" || echo "Bitorrent Transmission";)")"
+  echo "10) $(menu_item "dropbox" "Cloud Dropbox") $AUR"
+  echo "11) $(menu_item "Jdownloader" "Gestor de Descargas Jdownloader") $AUR"
+  echo "12) $(menu_item "uget" "Gestor de Descargas Uget")"
+  echo "13) $(menu_item "youtube-dl" "Youtube-dl")"
+  echo "14) $(menu_item "megasync" "Cloud Megasync")"
+  echo "15) $(menu_item "filezilla" "Filezilla")"
+  echo "16) $(menu_item "skypeforlinux-stable-bin" "Skype") $AUR"
+  echo "17) $(menu_item "telegram-desktop" "Telegram")"
+  echo "18) $(menu_item "pidgin")"
+  echo "19) $(menu_item "slack") $AUR"
+  echo "20) $(menu_item "zoom") $AUR"
+  echo "21) $(menu_item "remina" "Remina") $AUR"
+  echo "22) $(menu_item "teamviewer" "Teamviewer") $AUR"
+  echo "23) $(menu_item "anydesk" "Anydesk") $AUR"
+  echo "24) $(menu_item "teamspeak3" "TeamSpeak")"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  INTERNET_OPTIONS+=" s"
+  read_input_options "$INTERNET_OPTIONS"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        aur_package_install "google-chrome"
+        ;;
+      2)
+        package_install "chromium"
+        ;;
+      3)
+        package_install "firefox firefox-i18n-es-es"
+        ;;
+      4)
+        package_install "opera opera-ffmpeg-codecs"
+        ;;
+      5)
+        aur_package_install "tor-browser"
+        ;;
+      6)
+        if [[ ${KDE} -eq 1 ]]; then
+          package_install "konqueror"
+        else
+          package_install "midori"
+        fi
+        ;;
+      7)
+        package_install "liferea"
+        ;;
+      8)
+        package_install "thunderbird"
+        package_install "thunderbird-i18n-es-es"
+        ;;
+      9)
+        if [[ ${KDE} -eq 1 ]]; then
+          package_install "transmission-qt"
+        else
+          package_install "transmission-gtk"
+        fi
+        if [[ -f /home/${username}/.config/transmission/settings.json ]]; then
+          replace_line '"blocklist-enabled": false' '"blocklist-enabled": true' /home/${username}/.config/transmission/settings.json
+          replace_line "www\.example\.com\/blocklist" "list\.iblocklist\.com\/\?list=bt_level1&fileformat=p2p&archiveformat=gz" /home/${username}/.config/transmission/settings.json
+        fi
+        ;;
+      10)
+        aur_package_install "dropbox"
+        ;;
+      11)
+        aur_package_install "jdownloader"
+        ;;
+      12)
+        package_install "uget"
+        ;;
+      13)
+        package_install "youtube-dl"
+        ;;
+      14)
+        aur_package_install "megasync"
+        ;;
+      15)
+        package_install "filezilla"
+        ;;
+      16)
+        aur_package_install "skypeforlinux-stable-bin"
+        ;;
+      17)
+        package_install "telegram-desktop"
+        ;;
+      18)
+        package_install "pidgin"
+        ;;
+      19)
+        aur_package_install "slack-desktop"
+        ;;
+      20)
+        aur_package_install "zoom"
+        ;;
+      21)
+        package_install "remmina"
+        ;;
+      22)
+        aur_package_install "teamviewer"
+        ;;
+      23)
+        aur_package_install "anydesk"
+        ;;
+      24)
+        package_install "teamspeak3"
+        ;;
+      "s")
+        break
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  source sharedfuncs_elihw
+}
+#}}}
+#Aplicaciones_Oficina{{{
+instalar_app_oficina(){
+  print_title "OFICINA"
+  print_warning "USUARIO: ${username}"
+  echo ""
+  echo " 1) $(menu_item "calibre")"
+  echo " 2) $(menu_item "goldendict" "Diccionario oldendict")"
+  echo " 3) $(menu_item "homebank" "Gestor financiero Homebank")"
+  echo " 4) $(menu_item "texlive-most" "TeX Live")"
+  echo " 5) $(menu_item "libreoffice-fresh" "Suit Ofimatica LibreOffice")"
+  echo " 6) $(menu_item "lyx" "Procesador de Documentos lyx")"
+  echo " 7) $(menu_item "ocrfeeder" "Diseño Documentos Ocrfeeder")"
+  echo " 8) $(menu_item "tellico" "Administrador Colecciones KDE tellico")"
+  echo " 9) $(menu_item "typora" "Lector typora") $AUR"
+  echo "10) $(menu_item "xmind" "Mapas Mentales xmind")$AUR"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  OFFICE_OPTIONS+=" s"
+  read_input_options "$OFFICE_OPTIONS"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        package_install "calibre"
+        ;;
+      2)
+        package_install "goldendict"
+        ;;
+      3)
+        package_install "homebank"
+        ;;
+      4)
+        package_install "texlive-most"
+        ;;
+      5)
+        print_title "LIBREOFFICE - https://wiki.archlinux.org/index.php/LibreOffice"
+        package_install "libreoffice-fresh"
+        package_install "libreoffice-fresh-es"
+        package_install "hunspell hunspell-es_es hunspell-es_co"
+        package_install "aspell aspell-es"
+        ;;
+      6)
+        package_install "lyx"
+        ;;
+      7)
+        package_install "ocrfeeder tesseract gocr"
+        package_install "aspell aspell-es"
+        ;;
+      8)
+        package_install "tellico"
+        ;;
+      9)
+        aur_package_install "typora"
+        ;;
+      10)
+        aur_package_install "xmind"
+        ;;
+      "s")
+        break
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  source sharedfuncs_elihw
+}
+#}}}
+#Aplicaciones_Video{{{
+instalar_app_video(){
+  print_title "APLICACIONES PARA VIDEO REPRODUCCION/EDICION"
+  print_warning "USUARIOS: ${username}"
+  echo ""
+  echo " 1) $(menu_item "gnome-mplayer")"
+  echo " 2) $(menu_item "livestreamer")"
+  echo " 3) $(menu_item "minitube")"
+  echo " 4) $(menu_item "mpv")"
+  echo " 5) $(menu_item "smplayer")"
+  echo " 6) $(menu_item "parole")"
+  echo " 7) $(menu_item "vlc")"
+  echo " 8) $(menu_item "kodi")"
+  echo " 9) $(menu_item "arista") $AUR"
+  echo " 10) $(menu_item "avidemux-gtk avidemux-qt" "Avidemux")"
+  echo " 11) $(menu_item "filebot") $AUR"
+  echo " 12) $(menu_item "handbrake")"
+  echo " 13) $(menu_item "kdenlive")"
+  echo " 14) $(menu_item "lwks" "Lightworks") $AUR"
+  echo " 15) $(menu_item "openshot")"
+  echo " 16) $(menu_item "pitivi")"
+  echo " 17) $(menu_item "transmageddon")"
+  echo " 18) $(menu_item "libdvdnav" "Codecs")"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  VIDEO_OPTIONS+=" s"
+  read_input_options "$VIDEO_OPTIONS"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        package_install "gnome-mplayer"
+        ;;
+      2)
+        package_install "livestreamer"
+        ;;
+      3)
+        package_install "minitube"
+        ;;
+      4)
+        package_install "mpv"
+        ;;
+      5)
+        package_install "smplayer"
+        ;;
+      6)
+        package_install "parole"
+        ;;
+      7)
+        package_install "vlc"
+        ;;
+      8)
+        package_install "kodi"
+        add_user_to_group ${username} kodi
+      ;;
+      9)
+        aur_package_install "arista"
+        ;;
+      10)
+        if [[ ${KDE} -eq 1 ]]; then
+          package_install "avidemux-qt"
+        else
+          package_install "avidemux-gtk"
+        fi
+        ;;
+      11)
+        aur_package_install "filebot"
+        ;;
+      12)
+        package_install "handbrake"
+        ;;
+      13)
+        package_install "kdenlive"
+        ;;
+      14)
+        aur_package_install "lwks"
+        ;;
+      15)
+        package_install "openshot"
+        ;;
+      16)
+        package_install "pitivi frei0r-plugins"
+        ;;
+      17)
+        package_install "transmageddon"
+        ;;
+      18)
+        package_install "libdvdnav libdvdcss cdrdao cdrtools ffmpeg ffmpegthumbnailer ffmpegthumbs"
+        if [[ ${KDE} -eq 1 ]]; then
+          package_install "kdegraphics-thumbnailers"
+        fi
+        ;;
+      "s")
+        break
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  source sharedfuncs_elihw
+}
+#}}}
+#Aplicaciones_Web_Server{{{
+instalar_app_webserver(){
+  print_title "WEB SERVER - SERVIDORES WEB /LAMP|LAPP"
+  print_warning "USUARIO: ${username}"
+  echo ""
+  echo " 1) $(menu_item "mariadb" "LAMP - APACHE, MariaDB & PHP")"
+  echo " 2) $(menu_item "postgresql" "LAPP - APACHE, POSTGRESQL & PHP")"
+  echo " 3) $(menu_item "nginx" "LEMP - NGINX, MariaDB & PHP")"
+  echo " 4) $(menu_item "LEPP - NGINX, POSTGRESQL & PHP")"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  WEBSERVER+=" s"
+  read_input_options "$WEBSERVER"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        package_install "apache php php-apache php-gd"
+        instalar_mariadb
+        instalar_adminer
+        system_ctl enable httpd.service
+        configurar_php_apache
+        configurar_php "mariadb"
+        crear_sitio_folder
+        ;;
+      2)
+        package_install "apache php php-apache php-pgsql php-gd"
+        instalar_postgresql
+        instalar_adminer
+        system_ctl enable httpd.service
+        configurar_php_apache
+        configurar_php "postgresql"
+        crear_sitio_folder
+        ;;
+      3)
+        package_install "nginx php php-fpm"
+        instalar_mariadb
+        system_ctl enable nginx.service
+        system_ctl enable php-fpm.service
+        configurar_php_nginx
+        configurar_php "mariadb"
+        ;;
+      4)
+        package_install "nginx php php-fpm php-pgsql"
+        instalar_postgresql
+        system_ctl enable nginx.service
+        system_ctl enable php-fpm.service
+        configurar_php_nginx
+        configurar_php "postgresql"
+        ;;
+      "s")
+        break
+        ;;
+      *)
+      invalid_option
+      ;;
+    esac
+  done
+}
+instalar_adminer(){ #{{{
+  aur_package_install "adminer"
+  local ADMINER=`cat /etc/httpd/conf/httpd.conf | grep Adminer`
+  [[ -z $ADMINER ]] && echo -e '\n# Adminer Configuration\nInclude conf/extra/httpd-adminer.conf' >> /etc/httpd/conf/httpd.conf
+} #}}}
+instalar_mariadb(){ #{{{
+  package_install "mariadb"
+  /usr/bin/mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+  system_ctl enable mysqld.service
+  systemctl start mysqld.service
+  /usr/bin/mysql_secure_installation
+} #}}}
+instalar_postgresql(){ #{{{
+  package_install "postgresql"
+  mkdir -p /var/lib/postgres
+  chown -R postgres:postgres /var/lib/postgres
+  systemd-tmpfiles --create postgresql.conf
+  echo "Ingrese el password:"
+  passwd postgres
+  while [[ $? -ne 0 ]]; do
+    passwd postgres
+  done
+  su - postgres -c "initdb --locale ${LOCALE}.UTF-8 -D /var/lib/postgres/data"
+  system_ctl enable postgresql.service
+  system_ctl start postgresql.service
+  read_input_text "Install Postgis + Pgrouting" $POSTGIS
+  [[ $OPTION == s ]] && install_gis_extension
+} #}}}
+instalar_gis_extension(){ #{{{
+  package_install "postgis"
+  aur_package_install "pgrouting"
+} #}}}
+configurar_php(){ #{{{
+  if [[ -f /etc/php/php.ini.pacnew ]]; then
+    mv -v /etc/php/php.ini /etc/php/php.ini.pacold
+    mv -v /etc/php/php.ini.pacnew /etc/php/php.ini
+    rm -v /etc/php/php.ini.backup
+  fi
+  [[ -f /etc/php/php.ini.backup ]] && echo "/etc/php/php.ini.backup" || cp -v /etc/php/php.ini /etc/php/php.ini.backup
+  if [[ $1 == mariadb ]]; then
+    sed -i '/mysqli.so/s/^;//' /etc/php/php.ini
+    sed -i '/mysql.so/s/^;//' /etc/php/php.ini
+    sed -i '/skip-networking/s/^/#/' /etc/mysql/my.cnf
+  else
+    sed -i '/pgsql.so/s/^;//' /etc/php/php.ini
+  fi
+  sed -i '/mcrypt.so/s/^;//' /etc/php/php.ini
+  sed -i '/gd.so/s/^;//' /etc/php/php.ini
+  sed -i '/display_errors=/s/off/on/' /etc/php/php.ini
+} #}}}
+configurar_php_apache(){ #{{{
+  if [[ -f /etc/httpd/conf/httpd.conf.pacnew ]]; then
+    mv -v /etc/httpd/conf/httpd.conf.pacnew /etc/httpd/conf/httpd.conf
+    rm -v /etc/httpd/conf/httpd.conf.backup
+  fi
+  [[ -f /etc/httpd/conf/httpd.conf.backup ]] && echo "/etc/httpd/conf/httpd.conf.backup" || cp -v /etc/httpd/conf/httpd.conf /etc/httpd/conf/httpd.conf.backup
+  local IS_DISABLED=`cat /etc/httpd/conf/httpd.conf | grep php7_module.conf`
+  if [[ -z $IS_DISABLED ]]; then
+    echo -e 'application/x-httpd-php7                php php7' >> /etc/httpd/conf/mime.types
+    sed -i '/LoadModule dir_module modules\/mod_dir.so/a\LoadModule php7_module modules\/libphp7.so' /etc/httpd/conf/httpd.conf
+    echo -e '\n# Use for PHP 7.x:\nInclude conf/extra/php7_module.conf\n\nAddHandler php7-script php' >> /etc/httpd/conf/httpd.conf
+    #  libphp5.so included with php-apache does not work with mod_mpm_event (FS#39218). You'll have to use mod_mpm_prefork instead
+    replace_line 'LoadModule mpm_event_module modules/mod_mpm_event.so' 'LoadModule mpm_prefork_module modules/mod_mpm_prefork.so' /etc/httpd/conf/httpd.conf
+    replace_line 'DirectoryIndex\ index.html' 'DirectoryIndex\ index.html\ index.php' /etc/httpd/conf/httpd.conf
+  fi
+} #}}}
+configurar_php_nginx(){ #{{{
+  if [[ -f /etc/nginx/nginx.conf.pacnew ]]; then
+    mv -v /etc/nginx/nginx.conf.pacnew /etc/nginx/nginx.conf
+    rm -v /etc/nginx/nginx.conf.backup
+  fi
+  [[ -f /etc/nginx/nginx.conf.backup ]] && cp -v /etc/nginx/nginx.conf.backup /etc/nginx/nginx.conf || cp -v /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup
+  sed -i -e '/location ~ \.php$ {/,/}/d' /etc/nginx/nginx.conf
+  sed -i -e '/pass the PHP/a\        #\n        location ~ \.php$ {\n            fastcgi_pass   unix:/var/run/php-fpm/php-fpm.sock;\n            fastcgi_index  index.php;\n            root           /srv/http;\n            include        fastcgi.conf;\n        }' /etc/nginx/nginx.conf
+} #}}}
+crear_sitio_folder(){ #{{{
+  [[ ! -f  /etc/httpd/conf/extra/httpd-userdir.conf.aui ]] && cp -v /etc/httpd/conf/extra/httpd-userdir.conf /etc/httpd/conf/extra/httpd-userdir.conf.aui
+  replace_line 'public_html' 'Sites' /etc/httpd/conf/extra/httpd-userdir.conf
+  su - ${username} -c "mkdir -p ~/Sites"
+  su - ${username} -c "chmod o+x ~/ && chmod -R o+x ~/Sites"
+  print_line
+  echo "La Carpeta \"Sites\" ha sido creado en su usuario"
+  echo "para acceder a us proyecto \"http://localhost/~username\""
+  pause_function
+} #}}}
+#}}}
+#Instalar Funetes{{{
+instalar_fuentes(){
+  print_title "FONTS - https://wiki.archlinux.org/index.php/Fonts"
+  echo " 1) $(menu_item "ttf-dejavu")"
+  echo " 2) $(menu_item "ttf-fira-code") $AUR"
+  echo " 3) $(menu_item "ttf-google-fonts-git") $AUR"
+  echo " 4) $(menu_item "ttf-liberation")"
+  echo " 5) $(menu_item "ttf-bitstream-vera")"
+  echo " 6) $(menu_item "ttf-hack")"
+  echo " 7) $(menu_item "ttf-mac-fonts") $AUR"
+  echo " 8) $(menu_item "ttf-ms-fonts") $AUR"
+  echo " 9) $(menu_item "wqy-microhei") (Chinese/Japanese/Korean Support)"
+  echo "10) $(menu_item "noto-fonts-cjk") (Chinese/Japanese/Korean Support)"
+  echo "11) $(menu_item "nerd-fonts-complete") $AUR"
+  echo ""
+  echo " b) BACK"
+  echo ""
+  FONTS_OPTIONS+=" b"
+  read_input_options "$FONTS_OPTIONS"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        package_install "ttf-dejavu"
+        ;;
+      2)
+        aur_package_install "ttf-fira-code"
+        ;;
+      3)
+        package_remove "ttf-droid"
+        package_remove "ttf-roboto"
+        package_remove "ttf-ubuntu-font-family"
+        package_remove "otf-oswald-ib"
+        aur_package_install "ttf-google-fonts-git"
+        ;;
+      4)
+        package_install "ttf-liberation"
+        ;;
+      5)
+        package_install "ttf-bitstream-vera"
+        ;;
+      6)
+        package_install "ttf-hack"
+        ;;
+      7)
+        aur_package_install "ttf-mac-fonts"
+        ;;
+      8)
+        aur_package_install "ttf-ms-fonts"
+        ;;
+      9)
+        package_install "wqy-microhei"
+        ;;
+      10)
+        package_install "noto-fonts-cjk"
+        ;;
+      11)
+        package_install "nerd-fonts-complete"
+        ;;
+      "b")
+        break
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  source sharedfuncs_elihw
+}
+configurar_fuentes(){
+  print_title "CONFIGURACIÓN DE FUENTES "
+  print_info "Fontconfig es una biblioteca diseñada para proporcionar una lista de fuentes disponibles para las aplicaciones, y también para la configuración de cómo se representan las fuentes."
+  pacman -S --asdeps --needed cairo fontconfig freetype2 ttf-ubuntu-font-family  ttf-roboto ttf-roboto-mono ttf-opensans
+  pause_function
+}
+#}}}
+#Modo Lapto{{{
+instalar_tlp(){
+  print_title "TLP - Herramienta Mayormente para Equipos Portatiles, pero la puedes Usar donde quieras"
+  print_info "TLP es una herramienta avanzada de administración de energía para Linux. Es una herramienta de línea de comandos pura con tareas automatizadas en segundo plano."
+  read_input_text "Install TLP?" $TLP
+  if [[ $OPTION == s ]]; then
+    package_install "tlp"
+    aur_package_install "tlpui-git"
+    system_ctl enable tlp.service
+    system_ctl enable tlp-sleep.service
+    system_ctl mask systemd-rfkill.service
+    system_ctl mask systemd-rfkill.socket
+    tlp start
+    pause_function
+  fi
+}
+#}}}
+#Salir{{{
+salir(){
+  exit 0
+}
+#}}}
+#Inicio de Menu{{{
+check_root
+check_archlinux
+check_hostname
+check_pacman_blocked
+check_multilib
+pacman_key
+bienvenidos
+select_user
+instalar_comunes
+instalar_zsh
+if is_package_installed "qt5-wayland"; then KDE=1; fi
+while true
+do
+  print_title "INSTALADOR DE APLICACIONES MAS COMUNES"
+  echo ""
+  echo "  1) $(mainmenu_item "${checklist[1]}" "Aplicaciones: ACCESORIOS")"
+  echo "  2) $(mainmenu_item "${checklist[2]}" "Aplicaciones: AUDIO")"
+  echo "  3) $(mainmenu_item "${checklist[3]}" "Aplicaciones: DESARROLLO")"
+  echo "  4) $(mainmenu_item "${checklist[4]}" "Aplicaciones: GRAFICOS")"
+  echo "  5) $(mainmenu_item "${checklist[5]}" "Aplicaciones: HERRAMIENTES")"
+  echo "  6) $(mainmenu_item "${checklist[6]}" "Aplicaciones: INTERNET")"
+  echo "  7) $(mainmenu_item "${checklist[7]}" "Aplicaciones: OFICINA")"
+  echo "  8) $(mainmenu_item "${checklist[8]}" "Aplicaciones: VIDEO")"
+  echo "  9) $(mainmenu_item "${checklist[9]}" "Aplicaciones: WEB SERVER")"
+  echo " 10) $(mainmenu_item "${checklist[10]}" "Instalar Fuentes")"
+  echo " 11) $(mainmenu_item "${checklist[11]}" "Modo Laptop (Portatil)")"
+  echo ""
+  echo " s) Salida"
+  echo ""
+  MAINMENU+=" s"
+  read_input_options "$MAINMENU"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        instalar_app_accesorios
+        checklist[1]=1
+        ;;
+      2)
+        instalar_app_audio
+        checklist[2]=1
+        ;;
+      3)
+        instalar_app_desarrollo
+        checklist[3]=1
+        ;;
+      4)
+        instalar_app_graficos
+        checklist[4]=1
+        ;;
+      5)
+        instalar_app_herramientas
+        checklist[5]=1
+        ;;
+      6)
+        instalar_app_internet
+        checklist[6]=1
+        ;;
+      7)
+        instalar_app_oficina
+        checklist[7]=1
+        ;;
+      8)
+        instalar_app_video
+        checklist[8]=1
+        ;;
+      9)
+        instalar_app_webserver
+        checklist[9]=1
+        ;;
+      10)
+        instalar_fuentes
+        checklist[10]=1
+        ;;
+      11)
+        instalar_tlp
+        checklist[11]=1
+        ;;
+      "s")
+        salir
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+done
+#}}}

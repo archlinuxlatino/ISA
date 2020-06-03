@@ -1,0 +1,361 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+if [[ -f `pwd`/functions ]]; then
+  source functions
+else
+  echo "Archivo no disponible: functions"
+  exit 1
+fi
+#Bienvenidos{{{
+bienvenidos(){
+  clear
+  echo -e "${Bold}BIENVENIDOS AL INSTALADOR DE ESCRITORIOS${White}"
+  print_line
+  echo "Requerimientos:"
+  echo "-> Instalacion Sistema BASE ARCHLINUX"
+  echo "-> Instalacion SERVIDOR GRAFICO"
+  echo "-> Instalacion driver TARJETA DE VIDEO"
+  echo "-> Ejecutar Instalador como usuario root"
+  echo "-> Conexión a Internet"
+  print_line
+}
+#}}}
+#Seleccionar Usuario{{{
+select_user(){
+  print_title "SELECCIONAR USUARIO"
+  users_list=(`cat /etc/passwd | grep "/home" | cut -d: -f1`);
+  PS3="$prompt1"
+  echo "Usuarios Disponibles:"
+  if [[ $(( ${#users_list[@]} )) -gt 0 ]]; then
+    print_warning "ADVERTENCIA: EL USUARIO SELECCIONADO DEBE TENER PRIVILEGIOS SUDO"
+  else
+    echo ""
+  fi
+  select OPT in "${users_list[@]}"; do
+    if contains_element "$OPT" "${users_list[@]}"; then
+      username=$OPT
+    else
+      invalid_option
+    fi
+    [[ -n $OPT ]] && break
+  done
+}
+#}}}
+#Escritorios BUDGIE{{{
+instalar_desk_budgie(){
+  print_title "ESCRITORIO BUDGIE 10.5"
+  print_warning "USUARIO: ${username}"
+  print_info "BUDGIE es el escritorio predeterminado de Solus, escrito desde cero. Además de un diseño más moderno, Budgie puede emular la apariencia y la sensación del escritorio GNOME 2"
+  package_install "gnome gnome-extra gnome-software gnome-initial-setup telepathy"
+  package_install "deja-dup gedit-plugins gpaste gnome-tweak-tool gnome-power-manager"
+  package_install "budgie-desktop budgie-extras"
+  package_install "nautilus-share"
+  package_remove "aisleriot atomix four-in-a-row five-or-more gnome-2048 gnome-chess gnome-klotski gnome-mahjongg gnome-mines gnome-nibbles gnome-robots gnome-sudoku gnome-tetravex gnome-taquin swell-foop hitori iagno quadrapassel lightsoff"
+  config_xinitrc "export XDG_CURRENT_DESKTOP=Budgie:GNOME \n budgie-desktop"
+  GTK=1
+  pause_function
+  install_themes_gtk
+  system_ctl enable gdm
+}
+#}}}
+#Escritorios CINNAMON{{{
+instalar_desk_cinnamon(){
+  print_title "ESCRITORIO CINNAMON 4.6"
+  print_warning "USUARIO: ${username}"
+  print_info "Cinnamon es un Fork de GNOME Shell, inicialmente desarrollado por Linux Mint."
+  package_install "cinnamon nemo-fileroller nemo-preview"
+  package_install "gnome-screenshot gedit gnome-terminal gnome-control-center gnome-system-monitor gnome-schedule gnome-power-manager"
+  aur_package_install "mintlocale"
+  pause_function
+  is_package_installed "samba" && package_install "nemo-share"
+  config_xinitrc "cinnamon-session"
+  GTK=1
+  pause_function
+  instalar_themes_gtk
+}
+#}}}
+#Escritorios DEEPIN{{{
+instalar_desk_deepin(){
+  print_title "ESCRITORIO DEEPIN 4"
+  print_warning "USUARIO: ${username}"
+  print_info "La interfaz de escritorio y las aplicaciones proporcionar un sistema hermoso, fácil de usar, seguro y confiable para usuarios globales"
+  package_install "deepin deepin-extra lightdm-gtk-greeter lightdm-gtk-greeter-settings"
+  QT5=1
+  config_xinitrc "startdde"
+  pause_function
+  system_ctl enable lightdm
+  sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-deepin-greeter/' /etc/lightdm/lightdm.conf
+}
+#}}}
+#Escritorios GNOME{{{
+instalar_desk_gnome(){
+  print_title "ESCRITORIO GNOME 3.3"
+  print_warning "USUARIO: ${username}"
+  print_info "GNOME es un entorno de escritorio que pretende ser simple y fácil de utilizar. Se compone completamente de software libre y de código abierto."
+  package_install "gnome gnome-extra gnome-software gnome-initial-setup"
+  package_install "deja-dup gedit-plugins gpaste gnome-tweak-tool gnome-power-manager"
+  is_package_installed "samba" && package_install "nautilus-share"
+  package_remove "aisleriot atomix four-in-a-row five-or-more gnome-2048 gnome-chess gnome-klotski gnome-mahjongg gnome-mines gnome-nibbles gnome-robots gnome-sudoku gnome-tetravex gnome-taquin swell-foop hitori iagno quadrapassel lightsoff tali"
+  config_xinitrc "gnome-session"
+  GTK=1
+  pause_function
+  install_themes_gtk
+  system_ctl enable gdm
+}
+#}}}
+#Escritorios LXQT{{{
+instalar_desk_lxqt(){
+  print_title "ESCRITORIO LXQT"
+  print_warning "USUARIO: ${username}"
+  print_info "LXQt es una adaptación que utiliza Qt con la última versión de LXDE (Lightweight X11 Desktop Environment). Es el producto de la fusión entre los proyectos LXDE-Qt y Razor-Qt: Un entorno liviano, modular, rápido y amigable."
+  package_install "lxqt openbox breeze-icons"
+  package_install "leafpad epdfview"
+  mkdir -p /home/${username}/.config/lxqt
+  cp /etc/xdg/lxqt/* /home/${username}/.config/lxqt
+  mkdir -p /home/${username}/.config/openbox/
+  cp /etc/xdg/openbox/{menu.xml,rc.xml,autostart} /home/${username}/.config/openbox/
+  chown -R ${username}:users /home/${username}/.config
+  config_xinitrc "startlxqt"
+  pause_function
+  #install_misc_apps "LXQT"
+  instalar_themes_qt
+  QT5=1
+}
+#}}}
+#Escritorio LXDE{{{
+instalar_desk_lxde(){
+  print_title "ESCRITORIO LXDE"
+  print_warning "USUARIO: ${username}"
+  print_info "LXDE Lightweight X11 Desktop Environment es un entorno de escritorio rápido y de bajo consumo. Mantenido por una comunidad internacional de desarrolladores, viene con una interfaz atractiva, soporte multi-idioma, teclas de acceso rápido estándar y funciones adicionales como la navegación por pestañas de los archivos. "
+  package_install "lxde openbox"
+  package_install "leafpad epdfview"
+  is_package_installed "cups" && package_install "system-config-printer"
+  mkdir -p /home/${username}/.config/lxde
+  cp /etc/xdg/lxde/* /home/${username}/.config/lxde
+  mkdir -p /home/${username}/.config/openbox/
+  cp /etc/xdg/openbox/{menu.xml,rc.xml,autostart} /home/${username}/.config/openbox/
+  chown -R ${username}:users /home/${username}/.config
+  config_xinitrc "startlxde"
+  pause_function
+  instalar_themes_gtk
+  GTK=1
+}
+#}}}
+#Escritorios MATE{{{
+instalar_desk_mate(){
+  print_title "ESCRITORIO MATE 2"
+  print_warning "USUARIO: ${username}"
+  print_info ""
+  package_install "mate mate-extra"
+  is_package_installed "cups" && package_install "system-config-printer"
+  config_xinitrc "mate-session"
+  GTK3=1
+  pause_function
+  instalar_themes_gtk
+
+}
+#}}}
+#Escritorios PLASMA/KDE{{{
+instalar_desk_plasma(){
+  print_title "ESCRITORIO PLASMA/KDE 5"
+  print_warning "USUARIO: ${username}"
+  print_info "El entorno de escritorio KDE Plasma es un entorno de trabajo familiar. El escritorio Plasma ofrece todas las herramientas necesarias para una experiencia de escritorio moderna con enfasis en la productividad"
+  package_install "plasma kf5 sddm"
+  package_install "ark dolphin dolphin-plugins kio-extras kdeconnect quota-tools gwenview kipi-plugins kate kcalc konsole spectacle okular sweeper kwalletmanager packagekit-qt5"
+  package_install "choqok digikam k3b cdrdao dvd+rw-tools latte-dock skrooge yakuake"
+  is_package_installed "cups" && package_install "print-manager"
+  is_package_installed "samba" && package_install "smb4k"
+  config_xinitrc "startkde"
+  pause_function
+  system_ctl enable sddm
+  sddm --example-config > /etc/sddm.conf
+  sed -i 's/Current=/Current=breeze/' /etc/sddm.conf
+  sed -i 's/CursorTheme=/CursorTheme=breeze_cursors/' /etc/sddm.conf
+  sed -i 's/Numlock=none/Numlock=on/' /etc/sddm.conf
+  KDE=1
+}
+#}}}
+#Escritorios XFCE{{{
+instalar_desk_xfce(){
+  print_title "ESCRITORIO XFCE 4"
+  print_warning "USUARIO: ${username}"
+  print_info "Xfce encarna la filosofía tradicional UNIX de modularidad y la reutilización. Se compone de un número de elementos que proporcionan la funcionalidad completa que se puede esperar de un moderno entorno de escritorio, mientras permanece relativamente ligero"
+  package_install "xfce4 xfce4-goodies xarchiver mupdf"
+  is_package_installed "cups" && package_install "system-config-printer"
+  config_xinitrc "startxfce4"
+  GTK=1
+  pause_function
+  instalar_themes_gtk
+}
+#}}}
+#INSTALAR THEMES E ICONOS QT{{{}
+instalar_themes_qt(){
+  print_title "THEMES E ICONOS ESCRITORIOS BASADOS EN QT"
+  print_warning "USUARIO: ${username}"
+  print_info ""
+  package_install "materia-kde"
+}
+#}}}
+#INSTALAR THEMES E ICONOS GTK{{{
+instalar_themes_gtk(){
+  print_title "THEMES E ICONOS ESCRITORIOS BASADOS EN GTK"
+  print_warning "USUARIO: ${username}"
+  print_info ""
+  package_install "adwaita-icon-theme"
+  package_install "arc-gtk-theme arc-icon-theme"
+  package_install "deepin-icon-theme deepin-sound-theme deepin-gtk-theme"
+  package_install "elementary-icon-theme sound-theme-elementary gtk-theme-elementary"
+  package_install "adapta-gtk-theme papirus-icon-theme"
+  package_install "breeze-gtk breeze-grub breeze-icons"
+  package_install "materia-gtk-theme "
+  package_install "oxygen-gtk2 oxygen-icons"
+}
+#}}}
+#instalar gestor de inicio de sesion{{{
+instalar_session_init(){
+  print_title "DISPLAY MANAGER - ADMINISTRADOR DE SESION DE INICIO"
+  print_warning "USUARIO: ${username}"
+  print_info ""
+  echo ""
+  echo " 1) $(menu_item "gdm" "GDM = Gestor de pantallas de GNOME")"
+  echo " 2) $(menu_item "lightdm" "LightDM = Gestor de sesión inter-escritorio")"
+  echo " 3) $(menu_item "sddm" "SDDM = Administrador de pantalla de escritorio simple (Recomendado Plasma)")"
+  echo " 4) $(menu_item "slim" "Slim = Simple Login Manager-- para cualquier escritorio")"
+  echo " 5) $(menu_item "lxdm-gtk3" "Lxdm3 = Administrador de Pantalla de Escritorio LXDE GTK3")"
+  echo ""
+  echo " s) Salir"
+  echo ""
+  DISPLAY_MANAGER+=" s"
+  read_input_options "$DISPLAY_MANAGER"
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        package_install "gdm"
+        system_ctl enable gdm
+        ;;
+      2)
+        package_install "lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings lightdm-webkit-theme-litarvan"
+        system_ctl enable lightdm
+        ;;
+      3)
+        if [[ ${KDE} -eq 1 ]]; then
+          package_install "sddm sddm-kcm"
+        else
+          package_install "sddm"
+        fi
+        system_ctl enable sddm
+        sddm --example-config > /etc/sddm.conf
+        sed -i 's/Current=/Current=maldives/' /etc/sddm.conf
+        sed -i 's/CursorTheme=/CursorTheme=breeze_cursors/' /etc/sddm.conf
+        sed -i 's/Numlock=none/Numlock=on/' /etc/sddm.conf
+        ;;
+      4)
+        package_install "slim slim-themes archlinux-themes-slim"
+        sed -i 's/current_theme=/current_theme=archlinux-simplyblack/' /etc/slim.conf
+        system_ctl enable slim
+        ;;
+      5)
+        package_install "lxdm-gtk3"
+        system_ctl enable lxdm
+        ;;
+      "s")
+        break
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  source functions_elihw
+}
+#}}}
+#Verificar Tipo de Escritorio{{{
+if is_package_installed "qt5-wayland"; then KDE=1; fi
+if is_package_installed "gtk3"; then GTK=1;fi
+if is_package_installed "qt5"; then QT5=1;fi
+#}}}
+#Salir{{{
+salir(){
+  exit 0
+}
+#}}}
+#Inicio del sistema y menu {{{
+check_root
+check_archlinux
+check_hostname
+check_pacman_blocked
+check_multilib
+pacman_key
+bienvenidos
+select_user
+while true
+do
+  print_title "INSTALACION DE ESCRITORIOS VENTANA"
+  print_info  "Un entorno de escritorio proporciona una completa interfaz gráfica de usuario (GUI) para un sistema donde se agrupan una diversidad de clientes de X escritos con un conjunto de herramientas Widget y un conjunto de bibliotecas comunes."
+  print_warning "USUARIO: ${username}"
+  echo " "
+  echo "  1) $(menu_item "budgie-desktop" "Escritorio BUDGIE")"
+  echo "  2) $(menu_item "cinnamon-desktop" "Escritorio CINNAMON")"
+  echo "  3) $(menu_item "deepin-desktop-base" "Escritorio DEEPIN")"
+  echo "  4) $(menu_item "gnome-shell" "Escritorio GNOME")"
+  echo "  5) $(menu_item "lxqt-panel" "Escritorio LXQT")"
+  echo "  6) $(menu_item "lxpanel" "Escritorio LXDE")"
+  echo "  7) $(menu_item "mate-panel" "Escritorio MATE")"
+  echo "  8) $(menu_item "plasma-desktop" "Escritorio PLASMA/KDE")"
+  echo "  9) $(menu_item "xfce4-panel" "Escritorio XFCE")"
+  echo " 10) $(menu_item "materia-kde arc-gtk-theme" "Themes o Iconos")"
+  echo " 11) $(menu_item "slim gdm lxdm-gtk3 sddm" "Administrador de Sesiones")"
+  echo " "
+  echo " s) Salir"
+  echo " "
+  MAINMENU+=" s"
+  read_input_options "$MAINMENU"
+  for OPT in ${OPTIONS[@]}; do
+  case "$OPT" in
+    1)
+      instalar_desk_budgie
+      ;;
+    2)
+      instalar_desk_cinnamon
+      ;;
+    3)
+      instalar_desk_deepin
+      ;;
+    4)
+      instalar_desk_gnome
+      ;;
+    5)
+      instalar_desk_lxqt
+      ;;
+    6)
+      instalar_desk_lxde
+      ;;
+    7)
+      instalar_desk_mate
+      ;;
+    8)
+      instalar_desk_plasma
+      ;;
+    9)
+      instalar_desk_xfce
+      ;;
+    10)
+      if [[ ${KDE} -eq 1 ]]; then
+        instalar_themes_qt
+      else
+        instalar_themes_gtk
+      fi
+      ;;
+    11)
+      instalar_session_init
+      ;;
+    "s")
+      salir
+      ;;
+    *)
+      invalid_option
+      ;;
+  esac
+  done
+done
+#}}}
