@@ -344,6 +344,10 @@ formatear_particiones(){
             fi
             ;;
           otra)
+            if [[ ${partition_name[i]} == otra ]]; then
+              read_input_text "Deseas seguir Configurando mas Pariciones"
+              [[ $OPTION != s ]] && break
+            fi
             read -p "Punto de Montaje [ex: /home]:" directory
             [[ $directory == "/boot" ]] && BOOT_MOUNTPOINT=$(echo ${partition} | sed 's/[0-9]//')
             select_filesystem
