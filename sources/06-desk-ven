@@ -236,6 +236,9 @@ instalar_session_init(){
       2)
         package_install "lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings lightdm-webkit-theme-litarvan"
         system_ctl enable lightdm
+        add_line "[greeter]" "/etc/lightdm/lightdm-gtk-greeter.conf"
+        add_line "theme-name = Adwaita-dark" "/etc/lightdm/lightdm-gtk-greeter.conf"
+        add_line "icon-theme-name = elementary" "/etc/lightdm/lightdm-gtk-greeter.conf"
         ;;
       3)
         if [[ ${KDE} -eq 1 ]]; then
