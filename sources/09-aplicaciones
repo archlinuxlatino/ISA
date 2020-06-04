@@ -1125,7 +1125,7 @@ while true
 do
   print_title "INSTALADOR DE APLICACIONES MAS COMUNES"
   echo ""
-  echo "  1) $(mainmenu_item "${checklist[1]}" "Aplicaciones: ACCESORIOS")"
+  echo "  1) Aplicaciones: ACCESORIOS"
   echo "  2) $(mainmenu_item "${checklist[2]}" "Aplicaciones: AUDIO")"
   echo "  3) $(mainmenu_item "${checklist[3]}" "Aplicaciones: DESARROLLO")"
   echo "  4) $(mainmenu_item "${checklist[4]}" "Aplicaciones: GRAFICOS")"
