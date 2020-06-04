@@ -17,6 +17,7 @@ instalar_basicos(){
   print_title "AVAHI - USUARIO: ${username}"
   print_info "Avahi es una implementación gratuita de Zero Configuration Networking (Zeroconf), que incluye un sistema para descubrimiento de multidifusión DNS / DNS-SD. Permite que los programas publiquen y descubran servicios y hosts que se ejecutan en una red local sin una configuración específica."
   package_install "avahi nss-mdns"
+  package_install "xdg-user-dirs-gtk"
   is_package_installed "avahi" && system_ctl enable avahi-daemon.service
   pause_function
   print_title "ALSA - DRIVER DE SONIDO - USUARIO: ${username}"
