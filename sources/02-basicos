@@ -31,8 +31,6 @@ instalar_basicos(){
   print_info "Un sistema de archivos (o sistema de archivos) es un medio para organizar los datos que se espera que se retengan después de que un programa finaliza proporcionando procedimientos para almacenar, recuperar y actualizar datos, así como administrar el espacio disponible en los dispositivos que los contienen. Un sistema de archivos organiza los datos de manera eficiente y se ajusta a las características específicas del dispositivo."
   package_install "ntfs-3g dosfstools exfat-utils f2fs-tools fuse fuse-exfat autofs mtpfs"
   pause_function
-  package_install "ntfs-3g dosfstools exfat-utils f2fs-tools fuse fuse-exfat autofs mtpfs"
-  pause_function
   print_title "SYSTEMD-TIMESYNCD - SINCRONIZACION DE RELOJ POR LA RED - USUARIO: ${username}"
   print_info "systemd-timesyncd es un servicio que se ha añadido para sincronizar el reloj del sistema a través de la red. Implementa un cliente SNTP"
   timedatectl set-ntp true
