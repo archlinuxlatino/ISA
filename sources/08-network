@@ -248,7 +248,7 @@ do
   echo " 3) $(mainmenu_item "${checklist[3]}" "Instalar USB Moden 3G" "$([[ ${MODEN} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
   echo " 4) $(mainmenu_item "${checklist[4]}" "Instalar Protocolo SAMBA" "$([[ ${SAMBA} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
   echo " 5) $(mainmenu_item "${checklist[5]}" "Instalar Protocolo NFS" "$([[ ${NFS} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
-  echo " 5) $(mainmenu_item "${checklist[6]}" "Instalar Protocolo SSH" "$([[ ${SSH} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
+  echo " 6) $(mainmenu_item "${checklist[6]}" "Instalar Protocolo SSH" "$([[ ${SSH} -eq 1 ]] && echo "INSTALADO" || echo "NO INSTALADO";)")"
   echo " "
   echo " s) Salir"
   echo " "
