@@ -42,13 +42,14 @@ instalar_firmwares(){
       echo ""
       echo " 1) $(menu_item "alsa-firmware")"
       echo " 2) $(menu_item "bluez-firmware") [Broadcom BCM203x/STLC2300 Bluetooth]"
-      echo " 3) $(menu_item "broadcom-wl-dkms")"
-      echo " 4) $(menu_item "ipw2100-fw")"
-      echo " 5) $(menu_item "ipw2200-fw")"
-      echo " 6) $(menu_item "libffado") [Fireware Audio Devices]"
-      echo " 7) $(menu_item "libraw1394") [IEEE1394 Driver]"
-      echo " 8) $(menu_item "xf86-input-synaptics" "TouchPad Portatiles")"
-      echo " 9) $(menu_item "hplip" "Impresoras HP")[hplip]"
+      echo " 3) $(menu_item "broadcom-wl-dkms") [Broadcom 802.11 Linux STA wireless driver]"
+      echo " 4) $(menu_item "bcm43142a0-firmware")$AUR [Broadcom Bluetooth BCM43142A0]"
+      echo " 5) $(menu_item "ipw2100-fw")[Intel Centrino Drivers firmware for IPW2100]"
+      echo " 6) $(menu_item "ipw2200-fw")[Intel Centrino Drivers firmware for IPW2200]"
+      echo " 7) $(menu_item "libffado") [Fireware Audio Devices]"
+      echo " 8) $(menu_item "libraw1394") [IEEE1394 Driver]"
+      echo " 9) $(menu_item "xf86-input-synaptics" "TouchPad Portatiles")"
+      echo "10) $(menu_item "hplip" "Impresoras HP")[hplip]"
       echo ""
       echo " s) Salir"
       echo ""
@@ -66,21 +67,24 @@ instalar_firmwares(){
             package_install "broadcom-wl-dkms"
             ;;
           4)
-            package_install "ipw2100-fw"
+            aur_package_install "bcm43142a0-firmware"
             ;;
           5)
-            package_install "ipw2200-fw"
+            package_install "ipw2100-fw"
             ;;
           6)
-            package_install "libffado"
+            package_install "ipw2200-fw"
             ;;
           7)
-            package_install "libraw1394"
+            package_install "libffado"
             ;;
           8)
-            package_install "xf86-input-synaptics"
+            package_install "libraw1394"
             ;;
           9)
+            package_install "xf86-input-synaptics"
+            ;;
+          10)
             package_install "hplip"
             ;;
           "s")
