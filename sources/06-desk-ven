@@ -62,16 +62,22 @@ instalar_desk_budgie(){
 instalar_desk_cinnamon(){
   print_title "ESCRITORIO CINNAMON 4.6"
   print_warning "USUARIO: ${username}"
-  print_info "Cinnamon es un Fork de GNOME Shell, inicialmente desarrollado por Linux Mint."
-  package_install "cinnamon nemo-fileroller nemo-preview"
-  package_install "gnome-screenshot gedit gnome-terminal gnome-control-center gnome-system-monitor gnome-schedule gnome-power-manager"
+  print_info "Cinnamon es un Fork de GNOME Shell."
+  package_install "cinnamon cinnamon-translations xed xreader"
+  package_install "nemo-image-converter nemo-qml-plugin-notifications nemo-terminal nemo-fileroller nemo-preview nemo-seahorse"
+  package_install "gnome-screenshot gnome-terminal gnome-control-center gnome-system-monitor gnome-power-manager"
   aur_package_install "mintlocale"
+  aur_package_install "cinnamon-theme-numix-git"
   pause_function
   is_package_installed "samba" && package_install "nemo-share"
+  is_package_installed "cups" && package_install "system-config-printer"
   config_xinitrc "cinnamon-session"
   GTK=1
   pause_function
-  instalar_themes_gtk
+  mkdir -p /home/${username}/.config/autostart
+  echo "X-GNOME-Autostart-enabled=" >/home/${username}/.config/autostart/nm-applet.desktop
+  sed -i 's/X-GNOME-Autostart-enabled=/X-GNOME-Autostart-enabled=false/' /home/${username}/.config/autostart/nm-applet.desktop
+  instalar_bluetooth_cinnamon
 }
 #}}}
 #Escritorios DEEPIN{{{
@@ -270,6 +276,17 @@ instalar_session_init(){
     esac
   done
   source functions_elihw
+}
+#}}}
+#Instalar gestion bluetooth Cinnamon{{{
+instalar_bluetooth_cinnamon(){
+  print_title "Gestion Bluethoo - USUARIO: ${username}"
+  read_input_text "Instalar Gestion Bluethoo? " $BLUE
+  if [[ $OPTION == s ]]; then
+    package_install " bluez blueberry"
+    system_ctl enable bluetooth
+    pause_function
+  fi
 }
 #}}}
 #Verificar Tipo de Escritorio{{{
