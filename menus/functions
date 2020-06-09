@@ -527,6 +527,27 @@
     done
   }
   #}}}
+   aur_package_install() { #{{{
+    su - ${username} -c "sudo -v"
+    #install package from aur
+    for PKG in $1; do
+      if ! is_package_installed "${PKG}" ; then
+        if [[ $AUTOMATIC_MODE -eq 1 ]]; then
+          ncecho " ${BBlue}[${Reset}${Bold}X${BBlue}]${Reset} Installing ${AUR} ${Bold}${PKG}${Reset} "
+          su - ${username} -c "${AUR_PKG_MANAGER} --noconfirm -S ${PKG}" >>"$LOG" 2>&1 &
+          pid=$!;progress $pid
+        else
+          su - ${username} -c "${AUR_PKG_MANAGER} --noconfirm -S ${PKG}"
+        fi
+      else
+        if [[ $VERBOSE_MODE -eq 0 ]]; then
+          cecho " ${BBlue}[${Reset}${Bold}X${BBlue}]${Reset} Installing ${AUR} ${Bold}${PKG}${Reset} success"
+        else
+          echo -e "Warning: ${PKG} is up to date --skipping"
+        fi
+      fi
+    done
+  } #}}}
   package_install() { #{{{
     #install packages using pacman
     if [[ $AUTOMATIC_MODE -eq 1 || $VERBOSE_MODE -eq 0 ]]; then
