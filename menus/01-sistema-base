@@ -454,13 +454,13 @@ version_linux(){
   select VERSION in "${version_list[@]}"; do
     if contains_element "$VERSION" "${version_list[@]}"; then
       if [ "linux (normal)" == "$VERSION" ]; then
-        pacstrap ${MOUNTPOINT} base base-devel linux linux-headers broadcom-wl
+        pacstrap ${MOUNTPOINT} base base-devel linux linux-headers
     elif [ "linux-lts (Soporte a Largo Plazo)" == "$VERSION" ]; then
-        pacstrap ${MOUNTPOINT} base base-devel linux-lts linux-lts-headers broadcom-wl-dkms
+        pacstrap ${MOUNTPOINT} base base-devel linux-lts linux-lts-headers
     elif [ "linux-hardened (Seguridad Alta)" == "$VERSION" ]; then
-        pacstrap ${MOUNTPOINT} base base-devel linux-hardened linux-hardened-headers broadcom-wl-dkms
+        pacstrap ${MOUNTPOINT} base base-devel linux-hardened linux-hardened-headers
     elif [ "linux-zen (¿Por qué manejar si puedes volar?-ASUMES EL RETO..)" == "$VERSION" ]; then
-        pacstrap ${MOUNTPOINT} base base-devel linux-zen linux-zen-headers broadcom-wl-dkms
+        pacstrap ${MOUNTPOINT} base base-devel linux-zen linux-zen-headers
       fi
       pacstrap ${MOUNTPOINT} \
         linux-firmware nano dhcpcd vi lvm2 netctl net-tools
