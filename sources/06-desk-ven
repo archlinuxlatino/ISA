@@ -71,7 +71,7 @@ instalar_desk_cinnamon(){
   pause_function
   is_package_installed "samba" && package_install "nemo-share"
   is_package_installed "cups" && package_install "system-config-printer"
-  config_xinitrc "cinnamon-session"
+  #config_xinitrc "cinnamon-session"
   GTK=1
   pause_function
   mkdir -p /home/${username}/.config/autostart
@@ -87,7 +87,7 @@ instalar_desk_deepin(){
   print_info "La interfaz de escritorio y las aplicaciones proporcionar un sistema hermoso, fácil de usar, seguro y confiable para usuarios globales"
   package_install "deepin deepin-extra lightdm-gtk-greeter lightdm-gtk-greeter-settings"
   QT5=1
-  config_xinitrc "startdde"
+  #config_xinitrc "startdde"
   pause_function
   system_ctl enable lightdm
   sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-deepin-greeter/' /etc/lightdm/lightdm.conf
@@ -102,7 +102,7 @@ instalar_desk_gnome(){
   package_install "deja-dup gedit-plugins gpaste gnome-tweak-tool gnome-power-manager"
   is_package_installed "samba" && package_install "nautilus-share"
   package_remove "aisleriot atomix four-in-a-row five-or-more gnome-2048 gnome-chess gnome-klotski gnome-mahjongg gnome-mines gnome-nibbles gnome-robots gnome-sudoku gnome-tetravex gnome-taquin swell-foop hitori iagno quadrapassel lightsoff tali"
-  config_xinitrc "gnome-session"
+  #config_xinitrc "gnome-session"
   GTK=1
   pause_function
   install_themes_gtk
@@ -121,7 +121,7 @@ instalar_desk_lxqt(){
   mkdir -p /home/${username}/.config/openbox/
   cp /etc/xdg/openbox/{menu.xml,rc.xml,autostart} /home/${username}/.config/openbox/
   chown -R ${username}:users /home/${username}/.config
-  config_xinitrc "startlxqt"
+  #config_xinitrc "startlxqt"
   pause_function
   #install_misc_apps "LXQT"
   instalar_themes_qt
@@ -141,7 +141,7 @@ instalar_desk_lxde(){
   mkdir -p /home/${username}/.config/openbox/
   cp /etc/xdg/openbox/{menu.xml,rc.xml,autostart} /home/${username}/.config/openbox/
   chown -R ${username}:users /home/${username}/.config
-  config_xinitrc "startlxde"
+  #config_xinitrc "startlxde"
   pause_function
   instalar_themes_gtk
   GTK=1
@@ -154,7 +154,7 @@ instalar_desk_mate(){
   print_info ""
   package_install "mate mate-extra"
   is_package_installed "cups" && package_install "system-config-printer"
-  config_xinitrc "mate-session"
+  #config_xinitrc "mate-session"
   GTK3=1
   pause_function
   instalar_themes_gtk
@@ -171,7 +171,7 @@ instalar_desk_plasma(){
   package_install "choqok digikam k3b cdrdao dvd+rw-tools latte-dock skrooge yakuake"
   is_package_installed "cups" && package_install "print-manager"
   is_package_installed "samba" && package_install "smb4k"
-  config_xinitrc "startkde"
+  #config_xinitrc "startkde"
   pause_function
   system_ctl enable sddm
   sddm --example-config > /etc/sddm.conf
@@ -188,7 +188,7 @@ instalar_desk_xfce(){
   print_info "Xfce encarna la filosofía tradicional UNIX de modularidad y la reutilización. Se compone de un número de elementos que proporcionan la funcionalidad completa que se puede esperar de un moderno entorno de escritorio, mientras permanece relativamente ligero"
   package_install "xfce4 xfce4-goodies xarchiver mupdf"
   is_package_installed "cups" && package_install "system-config-printer"
-  config_xinitrc "startxfce4"
+  #config_xinitrc "startxfce4"
   GTK=1
   pause_function
   instalar_themes_gtk
