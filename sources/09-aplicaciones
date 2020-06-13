@@ -1129,7 +1129,7 @@ do
   echo "  2) $(mainmenu_item "${checklist[2]}" "Aplicaciones: AUDIO")"
   echo "  3) $(mainmenu_item "${checklist[3]}" "Aplicaciones: DESARROLLO")"
   echo "  4) $(mainmenu_item "${checklist[4]}" "Aplicaciones: GRAFICOS")"
-  echo "  5) $(mainmenu_item "${checklist[5]}" "Aplicaciones: HERRAMIENTES")"
+  echo "  5) $(mainmenu_item "${checklist[5]}" "Aplicaciones: HERRAMIENTAS")"
   echo "  6) $(mainmenu_item "${checklist[6]}" "Aplicaciones: INTERNET")"
   echo "  7) $(mainmenu_item "${checklist[7]}" "Aplicaciones: OFICINA")"
   echo "  8) $(mainmenu_item "${checklist[8]}" "Aplicaciones: VIDEO")"
