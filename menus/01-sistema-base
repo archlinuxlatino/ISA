@@ -230,10 +230,8 @@ formatear_particiones(){
     done
   }
   disable_partition() {
-    #remove the selected partition from list
     unset partitions_list[${partition_number}]
     partitions_list=(${partitions_list[@]})
-    #increase i
     [[ ${partition_name[i]} != otra ]] && i=$((i + 1))
   }
   format_partition() {
@@ -305,7 +303,7 @@ formatear_particiones(){
     fi
   }
   set_efi_partition() {
-    efi_options=("/boot/efi" "/boot")
+    efi_options=("/boot/efi" "/boot" "/efi")
     PS3="$prompt1"
     echo -e "Seleccione EFI:\n"
     select EFI_MOUNTPOINT in "${efi_options[@]}"; do
