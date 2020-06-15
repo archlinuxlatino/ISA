@@ -455,7 +455,7 @@ version_linux(){
       if [ "linux (normal)" == "$VERSION" ]; then
         pacstrap ${MOUNTPOINT} base base-devel linux linux-headers
     elif [ "linux-lts (Soporte a Largo Plazo)" == "$VERSION" ]; then
-        pacstrap ${MOUNTPOINT} base base-devel linux-lts linux-lts-headers
+        pacstrap ${MOUNTPOINT} base base-devel linux-lts linux-lts-headers acpi_call-lts
     elif [ "linux-hardened (Seguridad Alta)" == "$VERSION" ]; then
         pacstrap ${MOUNTPOINT} base base-devel linux-hardened linux-hardened-headers
     elif [ "linux-zen (¿Por qué manejar si puedes volar?-ASUMES EL RETO..)" == "$VERSION" ]; then
@@ -476,7 +476,7 @@ install_base(){
   print_info "Usando el script pacstrap, instalamos el sistema base. El grupo de paquetes base-devel también se instalará."
   rm ${MOUNTPOINT}${EFI_MOUNTPOINT}/vmlinuz-linux
   version_linux
-  pacstrap ${MOUNTPOINT} xdg-user-dirs grub hdparm
+  pacstrap ${MOUNTPOINT} xdg-user-dirs grub hdparm acpica
   [[ $? -ne 0 ]] && error_msg "Error al instalar el sistema base en ${MOUNTPOINT} Verifique los mensajes de error arriba."
   local PTABLE=$(parted -sl | grep "gpt")
   [[ -n $PTABLE ]] && pacstrap ${MOUNTPOINT} gptfdisk
