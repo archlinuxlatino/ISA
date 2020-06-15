@@ -50,6 +50,7 @@ seleccionar_teclado(){
 }
 configurar_teclado(){
   echo "KEYMAP=$KEYMAP" >${MOUNTPOINT}/etc/vconsole.conf
+  echo "FONT=Lat2-Terminus16" >{MOUNTPOINT}/etc/vconsole.conf
 }
 #}}}
 #Seleccionar Disco{{{
