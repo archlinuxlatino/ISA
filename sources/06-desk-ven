@@ -65,18 +65,15 @@ instalar_desk_cinnamon(){
   print_info "Cinnamon es un Fork de GNOME Shell."
   package_install "cinnamon cinnamon-translations xed xreader"
   package_install "nemo-image-converter nemo-qml-plugin-notifications nemo-terminal nemo-fileroller nemo-preview nemo-seahorse"
-  package_install "gnome-screenshot gnome-terminal gnome-control-center gnome-system-monitor gnome-power-manager"
+  package_install "pantheon-screenshot terminator flameshot gnome-system-monitor"
   aur_package_install "mintlocale"
   aur_package_install "cinnamon-theme-numix-git"
   pause_function
   is_package_installed "samba" && package_install "nemo-share"
   is_package_installed "cups" && package_install "system-config-printer"
-  #config_xinitrc "cinnamon-session"
+  config_xinitrc "cinnamon-session"
   GTK=1
   pause_function
-  mkdir -p /home/${username}/.config/autostart
-  echo "X-GNOME-Autostart-enabled=" >/home/${username}/.config/autostart/nm-applet.desktop
-  sed -i 's/X-GNOME-Autostart-enabled=/X-GNOME-Autostart-enabled=false/' /home/${username}/.config/autostart/nm-applet.desktop
   instalar_bluetooth_cinnamon
 }
 #}}}
