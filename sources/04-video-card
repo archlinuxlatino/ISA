@@ -125,7 +125,7 @@ instalar_video_cards(){
   #}}}
   #Intel {{{
   elif [[ ${VIDEO_DRIVER} == intel ]]; then
-    package_install "xf86-video-${VIDEO_DRIVER} mesa-libgl intel-ucode intel-media-driver libva-intel-driver"
+    package_install "xf86-video-${VIDEO_DRIVER} mesa-libgl intel-ucode"
   #}}}
   #Vesa {{{
   else
