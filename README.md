@@ -18,7 +18,7 @@
          chmod -R 777 ISA 
 
 ## COMO USAR
-    1 - installbase [Sistema Base/Escritorio/Aplicaciones]: cd ISA ; ./setuparch
+    1 - [Sistema Base/Escritorio/Aplicaciones]: cd ISA ; ./setuparch
     Contiene:
         Seleccion de Teclado.
         Editor Preferido.
